@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:3.13-trixie
+FROM mcr.microsoft.com/devcontainers/python:3.11-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PyTorch for CPU
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# Install PyTorch
+RUN pip install --no-cache-dir torch torchvision torchaudio
 
 # Install PyTorch Geometric
 RUN pip install --no-cache-dir torch_geometric
