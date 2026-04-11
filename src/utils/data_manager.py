@@ -2,6 +2,7 @@ import logging
 import os
 from typing import Optional
 
+import kagglehub  # type: ignore
 from huggingface_hub import HfApi, hf_hub_download
 
 
@@ -45,6 +46,20 @@ class DataSyncManager:
         except Exception as e:
             self.logger.error(f"Failed to download dataset file: {e}")
             raise RuntimeError(f"Download error: {e}") from e
+
+    def download_kaggle_dataset(self, handle: str) -> str:
+        """
+        Downloads a dataset from Kaggle using kagglehub.
+        Kagglehub automatically handles caching so if it's downloaded, it will just return the path.
+        """
+        self.logger.info(f"Checking/Downloading Kaggle dataset {handle}...")
+        try:
+            path = kagglehub.dataset_download(handle)
+            self.logger.info(f"Dataset ready at: {path}")
+            return path
+        except Exception as e:
+            self.logger.error(f"Failed to download from Kaggle: {e}")
+            raise RuntimeError(f"Kaggle download error: {e}") from e
 
     def upload_artifact(
         self, local_path: str, repo_id: str, remote_filename: str
