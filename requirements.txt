@@ -34,3 +34,6 @@ mlflow==3.10.*
 # ===== Testing =====
 # Marco necesario para validaciones unitarias en las transformaciones del grafo
 pytest==9.0.*
+
+# ===== Cloud Storage / Data Sync =====
+huggingface_hub==1.9.*
