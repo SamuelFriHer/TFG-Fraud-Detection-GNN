@@ -17,27 +17,27 @@ class DataPreprocessor:
         """
         self.encoders: dict[str, LabelEncoder] = {}
 
-    def _find_csv_file(self, directory: str) -> str:
+    def _find_csv_file(self, directory: str, dataset_prefix: str) -> str:
         """
         Locates a candidate CSV file within a given dataset directory.
-        Prioritizes smaller dataset for development if available.
+        Uses the provided prefix, e.g., 'HI-Small' to find the exact transaction file.
         """
-        files = os.listdir(directory)
-        csv_files = [f for f in files if f.endswith(".csv")]
-        if not csv_files:
-            raise FileNotFoundError(f"No CSV file found in {directory}")
+        expected_file = f"{dataset_prefix}_Trans.csv"
+        path = os.path.join(directory, expected_file)
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"Expected file {expected_file} not found in {directory}"
+            )
+        return path
 
-        for pref in ["HI-Small_Trans.csv", "HI-Medium_Trans.csv"]:
-            if pref in csv_files:
-                return os.path.join(directory, pref)
-        return os.path.join(directory, csv_files[0])
-
-    def load_data(self, dataset_path: str) -> pl.DataFrame:
+    def load_data(
+        self, dataset_path: str, dataset_prefix: str = "HI-Small"
+    ) -> pl.DataFrame:
         """
         Loads the dataset into a Polars DataFrame.
         """
         if os.path.isdir(dataset_path):
-            csv_path = self._find_csv_file(dataset_path)
+            csv_path = self._find_csv_file(dataset_path, dataset_prefix)
         else:
             csv_path = dataset_path
 
@@ -80,22 +80,32 @@ class DataPreprocessor:
         return pl.DataFrame(encoded_dict)
 
     def split_data(
-        self, df: pl.DataFrame, target_col: str, test_size: float = 0.2
-    ) -> Tuple[pl.DataFrame, pl.DataFrame, pl.Series, pl.Series]:
+        self, df: pl.DataFrame, target_col: str
+    ) -> Tuple[
+        pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.Series, pl.Series, pl.Series
+    ]:
         """
-        Splits data into train and test sets for ML validation.
-        Returns X_train, X_test, y_train, y_test.
+        Splits data into train, validate, and test sets (60% / 20% / 20%).
+        Returns X_train, X_val, X_test, y_train, y_val, y_test.
         """
         y = df[target_col]
         X = df.drop(target_col)
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X.to_pandas(), y.to_pandas(), test_size=test_size, random_state=42
+        # First split off 40% for validation and testing (remaining 60% for training)
+        X_train, X_temp, y_train, y_temp = train_test_split(
+            X.to_pandas(), y.to_pandas(), test_size=0.4, random_state=42
+        )
+
+        # Split the 40% evenly into 20% validate and 20% test
+        X_val, X_test, y_val, y_test = train_test_split(
+            X_temp, y_temp, test_size=0.5, random_state=42
         )
 
         return (
             pl.from_pandas(X_train),
+            pl.from_pandas(X_val),
             pl.from_pandas(X_test),
             pl.Series(y_train),
+            pl.Series(y_val),
             pl.Series(y_test),
         )
