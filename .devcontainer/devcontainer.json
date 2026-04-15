@@ -25,5 +25,9 @@
       ]
     }
   },
+  "containerEnv": {
+    "HF_HOME": "${containerWorkspaceFolder}/.cache/huggingface",
+    "KAGGLEHUB_CACHE": "${containerWorkspaceFolder}/.cache/kagglehub"
+  },
   "remoteUser": "vscode"
 }

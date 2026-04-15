@@ -1,9 +1,14 @@
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 import kagglehub  # type: ignore
 from huggingface_hub import HfApi, hf_hub_download
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+os.environ["KAGGLEHUB_CACHE"] = str(PROJECT_ROOT / ".cache" / "kagglehub")
+os.environ["HF_HOME"] = str(PROJECT_ROOT / ".cache" / "huggingface")
 
 
 class DataSyncManager:
