@@ -21,7 +21,20 @@ class StreamToLogger:
         Redirects standard string writes to the logger.
         """
         for line in buf.rstrip().splitlines():
-            self.logger.log(self.log_level, line.rstrip())
+            log_entry: str = line.rstrip()
+            if not log_entry:
+                continue
+
+            current_level: int = self.log_level
+            if current_level == logging.ERROR:
+                # Detect progress bars from downloads/uploads to prevent error logging
+                is_progress_bar: bool = (
+                    "%|" in log_entry or "B/s]" in log_entry or "it/s]" in log_entry
+                )
+                if is_progress_bar:
+                    current_level = logging.INFO
+
+            self.logger.log(current_level, log_entry)
 
     def flush(self) -> None:
         """
