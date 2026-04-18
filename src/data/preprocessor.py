@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 import polars as pl
 from sklearn.model_selection import train_test_split  # type: ignore
@@ -25,14 +24,10 @@ class DataPreprocessor:
         expected_file = f"{dataset_prefix}_Trans.csv"
         path = os.path.join(directory, expected_file)
         if not os.path.exists(path):
-            raise FileNotFoundError(
-                f"Expected file {expected_file} not found in {directory}"
-            )
+            raise FileNotFoundError(f"Expected file {expected_file} not found in {directory}")
         return path
 
-    def load_data(
-        self, dataset_path: str, dataset_prefix: str = "HI-Small"
-    ) -> pl.DataFrame:
+    def load_data(self, dataset_path: str, dataset_prefix: str = "HI-Small") -> pl.DataFrame:
         """
         Loads the dataset into a Polars DataFrame.
         """
@@ -56,9 +51,7 @@ class DataPreprocessor:
         df_clean = df.drop_nulls()
         return df_clean
 
-    def encode_features(
-        self, df: pl.DataFrame, categorical_cols: list[str]
-    ) -> pl.DataFrame:
+    def encode_features(self, df: pl.DataFrame, categorical_cols: list[str]) -> pl.DataFrame:
         """
         Encodes string categorical columns to numeric using LabelEncoder.
         Saves the encoders for future inverse transforms if necessary.
@@ -81,30 +74,28 @@ class DataPreprocessor:
 
     def split_data(
         self, df: pl.DataFrame, target_col: str
-    ) -> Tuple[
-        pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.Series, pl.Series, pl.Series
-    ]:
+    ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.Series, pl.Series, pl.Series]:
         """
         Splits data into train, validate, and test sets (60% / 20% / 20%).
         Returns X_train, X_val, X_test, y_train, y_val, y_test.
         """
         y = df[target_col]
-        X = df.drop(target_col)
+        x = df.drop(target_col)
 
         # First split off 40% for validation and testing (remaining 60% for training)
-        X_train, X_temp, y_train, y_temp = train_test_split(
-            X.to_pandas(), y.to_pandas(), test_size=0.4, random_state=42
+        x_train, x_temp, y_train, y_temp = train_test_split(
+            x.to_pandas(), y.to_pandas(), test_size=0.4, random_state=42
         )
 
         # Split the 40% evenly into 20% validate and 20% test
-        X_val, X_test, y_val, y_test = train_test_split(
-            X_temp, y_temp, test_size=0.5, random_state=42
+        x_val, x_test, y_val, y_test = train_test_split(
+            x_temp, y_temp, test_size=0.5, random_state=42
         )
 
         return (
-            pl.from_pandas(X_train),
-            pl.from_pandas(X_val),
-            pl.from_pandas(X_test),
+            pl.from_pandas(x_train),
+            pl.from_pandas(x_val),
+            pl.from_pandas(x_test),
             pl.Series(y_train),
             pl.Series(y_val),
             pl.Series(y_test),
