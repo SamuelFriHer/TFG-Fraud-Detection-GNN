@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tfg-fraud-detection-gnn"
+version = "0.1.0"
+description = "GNN vs Traditional ML for Anti-Money Laundering fraud detection."
+requires-python = ">=3.11"
+license = { text = "GPL-3.0-only" }
+
+dependencies = [
+    # Data processing
+    "polars>=1,<2",
+    "pandas>=2.2,<3",
+
+    # Traditional ML
+    "scikit-learn>=1.4,<2",
+    "xgboost>=2.0,<3",
+    "lightgbm>=4.3,<5",
+
+    # Graph manipulation
+    "networkx>=3,<4",
+
+    # Explainability (XAI)
+    "shap>=0.45,<1",
+    "lime>=0.2,<1",
+
+    # Visualization
+    "matplotlib>=3.8,<4",
+    "seaborn>=0.13,<1",
+
+    # Environment
+    "python-dotenv>=1.2,<2",
+
+    # MLOps
+    "mlflow>=3.10,<4",
+    "skops>=0.11,<1",
+
+    # Cloud storage
+    "huggingface_hub>=1.9,<2",
+    "kagglehub>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15,<1",
+    "mypy>=1.20,<2",
+    "pytest>=9.0,<10",
+    "jupyter>=1.0,<2",
+]
+
+[project.scripts]
+fraud-detect = "src.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
