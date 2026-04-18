@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import kagglehub  # type: ignore
 from huggingface_hub import HfApi, hf_hub_download
@@ -17,7 +16,7 @@ class DataSyncManager:
     Ensures that datasets are downloaded and experiment artifacts are uploaded.
     """
 
-    def __init__(self, token: Optional[str] = None):
+    def __init__(self, token: str | None = None):
         """
         Initializes the Data Sync module connecting to Hugging Face Hub.
         Requires HF_TOKEN environment variable correctly set if token is not passed.
@@ -27,9 +26,7 @@ class DataSyncManager:
         # Load token from env if not provided
         self.token = token or os.getenv("HF_TOKEN")
         if not self.token:
-            self.logger.warning(
-                "No Hugging Face token found. Functionality might be limited."
-            )
+            self.logger.warning("No Hugging Face token found. Functionality might be limited.")
 
         self.api = HfApi(token=self.token)
 
@@ -59,16 +56,14 @@ class DataSyncManager:
         """
         self.logger.info(f"Checking/Downloading Kaggle dataset {handle}...")
         try:
-            path = kagglehub.dataset_download(handle)
+            path: str = str(kagglehub.dataset_download(handle))
             self.logger.info(f"Dataset ready at: {path}")
             return path
         except Exception as e:
             self.logger.error(f"Failed to download from Kaggle: {e}")
             raise RuntimeError(f"Kaggle download error: {e}") from e
 
-    def upload_artifact(
-        self, local_path: str, repo_id: str, remote_filename: str
-    ) -> str:
+    def upload_artifact(self, local_path: str, repo_id: str, remote_filename: str) -> str:
         """
         Uploads a generated file (like a trained model) to a Hugging Face repository.
         """
