@@ -4,11 +4,13 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
+  "postCreateCommand": "pip install -e '.[dev]'",
   "customizations": {
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
         "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests/"],
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff",
           "editor.codeActionsOnSave": {
@@ -27,7 +29,8 @@
   },
   "containerEnv": {
     "HF_HOME": "${containerWorkspaceFolder}/.cache/huggingface",
-    "KAGGLEHUB_CACHE": "${containerWorkspaceFolder}/.cache/kagglehub"
+    "KAGGLEHUB_CACHE": "${containerWorkspaceFolder}/.cache/kagglehub",
+    "MLFLOW_TRACKING_URI": "sqlite:///${containerWorkspaceFolder}/outputs/mlflow/mlflow.db"
   },
   "remoteUser": "vscode"
 }
