@@ -1,0 +1,20 @@
+[dataset]
+handle = "ealtman2019/ibm-transactions-for-anti-money-laundering-aml"
+prefix = "HI-Small"
+
+[split]
+test_size = 0.4
+random_state = 42
+
+[models.XGBoost]
+eval_metric = "logloss"
+
+[models.RandomForest]
+n_estimators = 100
+random_state = 42
+
+[models.LightGBM]
+random_state = 42
+
+[models.SVM]
+random_state = 42
