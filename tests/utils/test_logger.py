@@ -1,11 +1,12 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
 from src.utils.logger import ProjectLogger
 
 
-def test_logger_creates_file(tmp_path):
+def test_logger_creates_file(tmp_path: Path) -> None:
     log_file = tmp_path / "test_logs.txt"
 
     # Reset singleton array for testing purposes
@@ -23,7 +24,7 @@ def test_logger_creates_file(tmp_path):
 
     # Assert logs exist
     assert os.path.exists(log_file)
-    with open(log_file, "r") as f:
+    with open(log_file) as f:
         content = f.read()
         assert "This is a test log" in content
         assert "This is a random print" in content

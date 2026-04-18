@@ -6,7 +6,7 @@ from src.utils.data_manager import DataSyncManager
 
 
 @patch("src.utils.data_manager.HfApi")
-def test_data_manager_initialization(mock_hfapi):
+def test_data_manager_initialization(mock_hfapi: MagicMock) -> None:
     # Test initialization cleanly grabs token or accepts it
     manager = DataSyncManager(token="fake_token")
     assert manager.token == "fake_token"
@@ -14,7 +14,7 @@ def test_data_manager_initialization(mock_hfapi):
 
 
 @patch("src.utils.data_manager.hf_hub_download")
-def test_download_dataset_file(mock_download):
+def test_download_dataset_file(mock_download: MagicMock) -> None:
     manager = DataSyncManager(token="fake_token")
     mock_download.return_value = "/fake/local/dir/dataset.csv"
 
@@ -32,7 +32,7 @@ def test_download_dataset_file(mock_download):
 
 @patch("os.path.exists")
 @patch("src.utils.data_manager.HfApi")
-def test_upload_artifact(mock_api_class, mock_exists):
+def test_upload_artifact(mock_api_class: MagicMock, mock_exists: MagicMock) -> None:
     mock_exists.return_value = True
 
     # Mocking HfApi instance
@@ -54,7 +54,7 @@ def test_upload_artifact(mock_api_class, mock_exists):
 
 
 @patch("os.path.exists")
-def test_upload_missing_artifact(mock_exists):
+def test_upload_missing_artifact(mock_exists: MagicMock) -> None:
     mock_exists.return_value = False
     manager = DataSyncManager(token="fake_token")
 
