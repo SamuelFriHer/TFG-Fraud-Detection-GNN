@@ -5,6 +5,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import polars as pl
 
 from src.data.preprocessor import DataPreprocessor
@@ -45,7 +46,7 @@ class TraditionalPipeline:
 
         self.logger.info("Pipeline completed for %d model(s).", len(requested_models))
 
-    def _preprocess(self, dataset_cfg: dict[str, Any]) -> dict[str, Any]:
+    def _preprocess(self, dataset_cfg: dict[str, Any]) -> dict[str, np.ndarray]:
         """Downloads and preprocesses the dataset exactly once."""
         self.logger.info("Downloading dataset '%s'...", dataset_cfg["handle"])
         dataset_path = self.sync_manager.download_kaggle_dataset(dataset_cfg["handle"])
@@ -69,9 +70,9 @@ class TraditionalPipeline:
             x_test.shape[0],
         )
         return {
-            "X_train": x_train,
-            "X_val": x_val,
-            "X_test": x_test,
+            "x_train": x_train,
+            "x_val": x_val,
+            "x_test": x_test,
             "y_train": y_train,
             "y_val": y_val,
             "y_test": y_test,
@@ -87,7 +88,7 @@ class TraditionalPipeline:
     def _train_and_evaluate(
         self,
         model_names: list[str],
-        splits: dict[str, Any],
+        splits: dict[str, np.ndarray],
         tracker: ExperimentTracker,
     ) -> None:
         """Iterates over requested models: train, evaluate on val+test, log to MLflow."""
@@ -99,13 +100,13 @@ class TraditionalPipeline:
             tracker.start_run(run_name=model_name)
             tracker.log_params(model_params)
 
-            model.train(splits["X_train"], splits["y_train"])
+            model.train(splits["x_train"], splits["y_train"])
 
-            val_metrics = model.evaluate(splits["X_val"], splits["y_val"])
+            val_metrics = model.evaluate(splits["x_val"], splits["y_val"])
             self.logger.info("Validation metrics for %s: %s", model_name, val_metrics)
             tracker.log_metrics({f"val_{key}": value for key, value in val_metrics.items()})
 
-            test_metrics = model.evaluate(splits["X_test"], splits["y_test"])
+            test_metrics = model.evaluate(splits["x_test"], splits["y_test"])
             self.logger.info("Test metrics for %s: %s", model_name, test_metrics)
             tracker.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
 
