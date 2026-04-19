@@ -6,6 +6,7 @@ import sys
 from dotenv import load_dotenv
 
 from src.models.traditional import ALL_MODEL_NAMES
+from src.pipelines.results_exporter import ResultsExporter
 from src.pipelines.traditional_pipeline import TraditionalPipeline
 from src.utils.logger import ProjectLogger
 
@@ -29,6 +30,26 @@ def _build_traditional_parser(subparsers: argparse._SubParsersAction) -> None:  
         nargs="+",
         default=["all"],
         help="Models to train. Use 'all' for every registered model.",
+    )
+
+
+def _build_fetch_results_parser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore
+    """Registers the 'fetch-results' subcommand with its arguments."""
+    parser = subparsers.add_parser(
+        "fetch-results",
+        help="Download MLflow results from HF Hub and export them to CSV.",
+    )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        required=True,
+        help="MLflow experiment name to fetch (e.g. 'traditional_HI-Small').",
+    )
+    parser.add_argument(
+        "--repo",
+        type=str,
+        default=None,
+        help="HF model repo ID. Defaults to HF_MODEL_REPO_ID env variable.",
     )
 
 
@@ -56,6 +77,18 @@ def _run_traditional(args: argparse.Namespace) -> None:
     pipeline.run(requested_models=model_names)
 
 
+def _run_fetch_results(args: argparse.Namespace) -> None:
+    """Downloads the MLflow archive from HF Hub and exports runs to CSV."""
+    logger = ProjectLogger.get_logger("CLI")
+    logger.info("Fetching results for experiment: %s", args.experiment)
+    exporter = ResultsExporter()
+    csv_path = exporter.fetch_and_export(
+        experiment_name=args.experiment,
+        hf_repo_id=args.repo,
+    )
+    logger.info("Done. CSV available at: %s", csv_path)
+
+
 def main() -> None:
     """Parses CLI arguments and dispatches to the appropriate pipeline."""
     ProjectLogger.initialize()
@@ -67,11 +100,13 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="pipeline", required=True)
 
     _build_traditional_parser(subparsers)
+    _build_fetch_results_parser(subparsers)
 
     args = parser.parse_args()
 
     dispatch = {
         "traditional": _run_traditional,
+        "fetch-results": _run_fetch_results,
     }
 
     handler = dispatch.get(args.pipeline)

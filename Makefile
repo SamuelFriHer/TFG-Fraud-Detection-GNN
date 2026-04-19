@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck clean run-traditional run-traditional-large
+.PHONY: install test lint typecheck clean run-traditional run-traditional-large fetch-results
 
 install:
 	pip install -e ".[dev]"
@@ -22,3 +22,8 @@ run-traditional:
 
 run-traditional-large:
 	python -m src.cli traditional --config configs/traditional_hi_large.toml --models all
+
+# Downloads MLflow results from HF Hub and exports them to outputs/results/<experiment>_results.csv
+# Usage: make fetch-results EXPERIMENT=traditional_HI-Small
+fetch-results:
+	python -m src.cli fetch-results --experiment $(EXPERIMENT)

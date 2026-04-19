@@ -49,6 +49,23 @@ class DataSyncManager:
             self.logger.error(f"Failed to download dataset file: {e}")
             raise RuntimeError(f"Download error: {e}") from e
 
+    def download_model_file(self, repo_id: str, filename: str, local_dir: str) -> str:
+        """Downloads a specific file from a model repository (e.g., MLflow archives)."""
+        self.logger.info(f"Downloading model file {filename} from {repo_id}...")
+        try:
+            path = hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                repo_type="model",
+                local_dir=local_dir,
+                token=self.token,
+            )
+            self.logger.info(f"Successfully downloaded to {path}")
+            return path
+        except Exception as e:
+            self.logger.error(f"Failed to download model file: {e}")
+            raise RuntimeError(f"Download error: {e}") from e
+
     def download_kaggle_dataset(self, handle: str) -> str:
         """
         Downloads a dataset from Kaggle using kagglehub.
