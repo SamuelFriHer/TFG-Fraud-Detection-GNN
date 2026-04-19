@@ -35,7 +35,6 @@ dependencies = [
 
     # MLOps
     "mlflow>=3.10,<4",
-    "skops>=0.11,<1",
 
     # Cloud storage
     "huggingface_hub>=1.9,<2",

@@ -43,7 +43,7 @@ class ExperimentTracker:
 
     def log_model(self, model: Any, model_name: str) -> None:
         """Persists the trained model via MLflow's native sklearn integration."""
-        mlflow.sklearn.log_model(model, name=model_name, serialization_format="skops")
+        mlflow.sklearn.log_model(model, name=model_name)
         self.logger.info("Model artifact saved as '%s'", model_name)
 
     def end_run(self) -> None:
