@@ -1,6 +1,7 @@
 """LightGBM classifier implementing IClassificationModel."""
 
 import logging
+import warnings
 from typing import Any
 
 from lightgbm import LGBMClassifier
@@ -31,7 +32,19 @@ class LightGBMModel(IClassificationModel):
 
     def predict(self, x_input: Any) -> Any:
         """Returns class predictions for the given input."""
-        return self.classifier.predict(x_input)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            predictions = self.classifier.predict(x_input)
+            for warning in w:
+                if "X does not have valid feature names" in str(warning.message):
+                    self.logger.info(
+                        "Ignored LightGBM false positive warning regarding feature names."
+                    )
+                else:
+                    warnings.showwarning(
+                        warning.message, warning.category, warning.filename, warning.lineno
+                    )
+        return predictions
 
     def evaluate(self, x_test: Any, y_test: Any) -> dict[str, float]:
         """Computes accuracy, precision, recall, and F1 against test labels."""
