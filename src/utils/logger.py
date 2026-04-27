@@ -1,5 +1,6 @@
 import logging
 import sys
+import types
 from typing import Optional
 
 
@@ -60,6 +61,7 @@ class ProjectLogger:
 
         self._configure_logging(log_file, level)
         self._redirect_std_streams()
+        self._setup_excepthook()
 
         ProjectLogger.__instance = self
 
@@ -89,6 +91,28 @@ class ProjectLogger:
         """
         sys.stdout = StreamToLogger(self.logger, logging.INFO)  # type: ignore
         sys.stderr = StreamToLogger(self.logger, logging.ERROR)  # type: ignore
+
+    def _setup_excepthook(self) -> None:
+        """
+        Registers a global exception handler to log fatal errors.
+        """
+
+        def handle_exception(
+            exc_type: type[BaseException],
+            exc_value: BaseException,
+            exc_traceback: types.TracebackType | None,
+        ) -> None:
+            """Internal handler for sys.excepthook."""
+            if issubclass(exc_type, KeyboardInterrupt):
+                self.logger.info("Execution interrupted by user (KeyboardInterrupt)")
+                return
+
+            self.logger.critical(
+                "Uncaught exception - Program termination",
+                exc_info=(exc_type, exc_value, exc_traceback),
+            )
+
+        sys.excepthook = handle_exception
 
     @staticmethod
     def get_logger(name: str) -> logging.Logger:
