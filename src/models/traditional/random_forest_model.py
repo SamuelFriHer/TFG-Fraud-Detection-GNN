@@ -19,7 +19,7 @@ class RandomForestModel(IClassificationModel):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initializes RandomForest with sensible defaults, overridable via kwargs."""
-        defaults: dict[str, Any] = {"random_state": 42}
+        defaults: dict[str, Any] = {"random_state": 42, "verbose": 2}
         defaults.update(kwargs)
         self.classifier = RandomForestClassifier(**defaults)
         self.logger = logging.getLogger(__name__)

@@ -92,6 +92,8 @@ class TraditionalPipeline:
         tracker: ExperimentTracker,
     ) -> None:
         """Iterates over requested models: train, evaluate on val+test, log to MLflow."""
+        import time
+
         for model_name in model_names:
             self.logger.info("=== Running model: %s ===", model_name)
             model_params = self.config.get("models", {}).get(model_name, {})
@@ -100,7 +102,19 @@ class TraditionalPipeline:
             tracker.start_run(run_name=model_name)
             tracker.log_params(model_params)
 
-            model.train(splits["x_train"], splits["y_train"])
+            x_train = splits["x_train"]
+            y_train = splits["y_train"]
+            self.logger.info(
+                "Training %s on %d samples with %d features...",
+                model_name,
+                x_train.shape[0],
+                x_train.shape[1],
+            )
+
+            start_time = time.perf_counter()
+            model.train(x_train, y_train)
+            duration = time.perf_counter() - start_time
+            self.logger.info("Training of %s completed in %.2f seconds.", model_name, duration)
 
             val_metrics = model.evaluate(splits["x_val"], splits["y_val"])
             self.logger.info("Validation metrics for %s: %s", model_name, val_metrics)

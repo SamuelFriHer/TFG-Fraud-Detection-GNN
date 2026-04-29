@@ -21,6 +21,7 @@ class XGBoostModel(IClassificationModel):
         """Initializes XGBoost with sensible defaults, overridable via kwargs."""
         defaults: dict[str, Any] = {
             "eval_metric": "logloss",
+            "verbosity": 2,
         }
         defaults.update(kwargs)
         self.classifier = XGBClassifier(**defaults)

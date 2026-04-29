@@ -19,7 +19,7 @@ class SVMModel(IClassificationModel):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initializes SVM with sensible defaults, overridable via kwargs."""
-        defaults: dict[str, Any] = {"random_state": 42}
+        defaults: dict[str, Any] = {"random_state": 42, "verbose": True}
         defaults.update(kwargs)
         self.classifier = SVC(**defaults)
         self.logger = logging.getLogger(__name__)

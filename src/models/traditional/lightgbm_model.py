@@ -20,7 +20,7 @@ class LightGBMModel(IClassificationModel):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initializes LightGBM with sensible defaults, overridable via kwargs."""
-        defaults: dict[str, Any] = {"random_state": 42}
+        defaults: dict[str, Any] = {"random_state": 42, "verbosity": 2}
         defaults.update(kwargs)
         self.classifier = LGBMClassifier(**defaults)
         self.logger = logging.getLogger(__name__)
