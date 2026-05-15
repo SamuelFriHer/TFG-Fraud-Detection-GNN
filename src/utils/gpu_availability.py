@@ -28,7 +28,10 @@ class GpuAvailabilityChecker:
             return GpuAvailabilityChecker._cuml_detected
 
         try:
-            import cuml  # type: ignore
+            import importlib.util
+
+            if importlib.util.find_spec("cuml") is None:
+                raise ImportError("cuml not installed")
             import cupy  # type: ignore
 
             # Try to get device count to verify driver sufficiency
@@ -39,7 +42,7 @@ class GpuAvailabilityChecker:
         except ImportError:
             GpuAvailabilityChecker._cuml_detected = False
             self._logger.info("cuML not found. Using scikit-learn (CPU).")
-        except Exception as e:
+        except RuntimeError as e:
             GpuAvailabilityChecker._cuml_detected = False
             self._logger.warning(
                 "cuML installed but NOT functional (Driver issue?): %s. Falling back to CPU.", e

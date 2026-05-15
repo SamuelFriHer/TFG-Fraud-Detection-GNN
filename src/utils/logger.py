@@ -1,26 +1,21 @@
+"""Centralized logging configuration for the project."""
+
 import logging
 import sys
 import types
-from typing import Optional
 
 
 class StreamToLogger:
-    """
-    Fake file-like stream object that redirects writes to a logger instance.
-    """
+    """Fake file-like stream object that redirects writes to a logger instance."""
 
     def __init__(self, logger: logging.Logger, log_level: int = logging.INFO) -> None:
-        """
-        Initializes the stream redirector.
-        """
+        """Initializes the stream redirector."""
         self.logger = logger
         self.log_level = log_level
         self.linebuf = ""
 
     def write(self, buf: str) -> None:
-        """
-        Redirects standard string writes to the logger.
-        """
+        """Redirects standard string writes to the logger."""
         for line in buf.rstrip().splitlines():
             log_entry: str = line.rstrip()
             if not log_entry:
@@ -38,24 +33,17 @@ class StreamToLogger:
             self.logger.log(current_level, log_entry)
 
     def flush(self) -> None:
-        """
-        Flush method for compatibility with file-like objects.
-        """
+        """Flush method for compatibility with file-like objects."""
         pass
 
 
 class ProjectLogger:
-    """
-    Centralized logging configuration for the project.
-    Ensures that all generic output and exceptions are written to a file.
-    """
+    """Ensures that all generic output and exceptions are written to a file."""
 
-    __instance: Optional["ProjectLogger"] = None
+    __instance: "ProjectLogger | None" = None
 
     def __init__(self, log_file: str = "logs.txt", level: int = logging.INFO) -> None:
-        """
-        Configures the root logger and redirects standard streams.
-        """
+        """Configures the root logger and redirects standard streams."""
         if ProjectLogger.__instance is not None:
             return
 
@@ -66,9 +54,7 @@ class ProjectLogger:
         ProjectLogger.__instance = self
 
     def _configure_logging(self, log_file: str, level: int) -> None:
-        """
-        Sets up the root logger with a file handler and a console handler.
-        """
+        """Sets up the root logger with a file handler and a console handler."""
         self.logger = logging.getLogger()
         self.logger.setLevel(level)
 
@@ -86,16 +72,12 @@ class ProjectLogger:
         self.logger.addHandler(console_handler)
 
     def _redirect_std_streams(self) -> None:
-        """
-        Redirects stdout and stderr to the configured logger.
-        """
+        """Redirects stdout and stderr to the configured logger."""
         sys.stdout = StreamToLogger(self.logger, logging.INFO)  # type: ignore
         sys.stderr = StreamToLogger(self.logger, logging.ERROR)  # type: ignore
 
     def _setup_excepthook(self) -> None:
-        """
-        Registers a global exception handler to log fatal errors.
-        """
+        """Registers a global exception handler to log fatal errors."""
 
         def handle_exception(
             exc_type: type[BaseException],
@@ -116,15 +98,11 @@ class ProjectLogger:
 
     @staticmethod
     def get_logger(name: str) -> logging.Logger:
-        """
-        Returns a logger instance with the specified name.
-        """
+        """Returns a logger instance with the specified name."""
         return logging.getLogger(name)
 
     @classmethod
     def initialize(cls, log_file: str = "logs.txt") -> None:
-        """
-        Initializes the singleton logger system.
-        """
+        """Initializes the singleton logger system."""
         if cls.__instance is None:
             cls(log_file=log_file)
