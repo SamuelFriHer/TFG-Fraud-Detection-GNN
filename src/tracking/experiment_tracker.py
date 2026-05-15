@@ -2,16 +2,13 @@
 
 import logging
 import os
-from pathlib import Path
+import tarfile
 from typing import Any
 
 import mlflow
 
 from src.utils.data_manager import DataSyncManager
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-MLFLOW_DIR = PROJECT_ROOT / "outputs" / "mlflow"
-MLFLOW_DB_PATH = MLFLOW_DIR / "mlflow.db"
+from src.utils.paths import MLFLOW_DB_PATH, MLFLOW_DIR, PROJECT_ROOT
 
 
 class ExperimentTracker:
@@ -41,7 +38,7 @@ class ExperimentTracker:
         mlflow.log_metrics(metrics)
         self.logger.info("Logged metrics: %s", metrics)
 
-    def log_model(self, model: Any, model_name: str) -> None:
+    def log_model(self, model: object, model_name: str) -> None:
         """Persists the trained model, supporting both sklearn and cuML backends."""
         try:
             mlflow.sklearn.log_model(model, name=model_name)
@@ -74,9 +71,8 @@ class ExperimentTracker:
         )
         self.logger.info("MLflow results uploaded to %s", repo_id)
 
-    def _compress_mlflow_store(self, output_path: Path) -> None:
+    @staticmethod
+    def _compress_mlflow_store(output_path: "os.PathLike[str]") -> None:
         """Creates a tar.gz archive of the MLflow tracking directory."""
-        import tarfile
-
         with tarfile.open(output_path, "w:gz") as tar:
             tar.add(MLFLOW_DIR, arcname="mlflow")
