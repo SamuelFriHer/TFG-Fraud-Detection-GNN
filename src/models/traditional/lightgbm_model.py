@@ -6,18 +6,13 @@ from typing import Any
 
 import numpy as np
 from lightgbm import LGBMClassifier
-from sklearn.metrics import (  # type: ignore
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-)
 
 from src.models.base import IClassificationModel
+from src.models.classification_metrics import ClassificationMetricsMixin
 from src.utils.gpu_availability import GpuAvailabilityChecker
 
 
-class LightGBMModel(IClassificationModel):
+class LightGBMModel(IClassificationModel, ClassificationMetricsMixin):
     """LightGBM gradient boosting classifier with automatic GPU acceleration."""
 
     def __init__(self, **kwargs: Any) -> None:
@@ -32,12 +27,12 @@ class LightGBMModel(IClassificationModel):
         defaults.update(kwargs)
         self.classifier = LGBMClassifier(**defaults)
 
-    def train(self, x_train: Any, y_train: Any) -> None:
+    def train(self, x_train: np.ndarray, y_train: np.ndarray) -> None:
         """Fits the LightGBM classifier on training data."""
         self.logger.info("Training LightGBM Classifier...")
         self.classifier.fit(x_train, y_train)
 
-    def predict(self, x_input: Any) -> np.ndarray:
+    def predict(self, x_input: np.ndarray) -> np.ndarray:
         """Returns class predictions for the given input."""
         with warnings.catch_warnings(record=True) as caught_warnings:
             warnings.simplefilter("always")
@@ -45,19 +40,14 @@ class LightGBMModel(IClassificationModel):
             self._handle_prediction_warnings(caught_warnings)
         return np.asarray(predictions)
 
-    def evaluate(self, x_test: Any, y_test: Any) -> dict[str, float]:
+    def evaluate(self, x_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
         """Computes accuracy, precision, recall, and F1 against test labels."""
         predictions = self.predict(x_test)
-        metrics: dict[str, float] = {
-            "accuracy": float(accuracy_score(y_test, predictions)),
-            "precision": float(precision_score(y_test, predictions, zero_division=0)),
-            "recall": float(recall_score(y_test, predictions, zero_division=0)),
-            "f1": float(f1_score(y_test, predictions, zero_division=0)),
-        }
+        metrics = self.compute_classification_metrics(y_test, predictions)
         self.logger.info("LightGBM metrics: %s", metrics)
         return metrics
 
-    def get_underlying_model(self) -> Any:
+    def get_underlying_model(self) -> object:
         """Returns the LGBMClassifier instance."""
         return self.classifier
 

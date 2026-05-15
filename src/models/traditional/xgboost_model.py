@@ -4,19 +4,14 @@ import logging
 from typing import Any
 
 import numpy as np
-from sklearn.metrics import (  # type: ignore
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-)
 from xgboost import XGBClassifier
 
 from src.models.base import IClassificationModel
+from src.models.classification_metrics import ClassificationMetricsMixin
 from src.utils.gpu_availability import GpuAvailabilityChecker
 
 
-class XGBoostModel(IClassificationModel):
+class XGBoostModel(IClassificationModel, ClassificationMetricsMixin):
     """XGBoost gradient boosting classifier with automatic CUDA acceleration."""
 
     def __init__(self, **kwargs: Any) -> None:
@@ -31,27 +26,22 @@ class XGBoostModel(IClassificationModel):
         defaults.update(kwargs)
         self.classifier = XGBClassifier(**defaults)
 
-    def train(self, x_train: Any, y_train: Any) -> None:
+    def train(self, x_train: np.ndarray, y_train: np.ndarray) -> None:
         """Fits the XGBoost classifier on training data."""
         self.logger.info("Training XGBoost Classifier...")
         self.classifier.fit(x_train, y_train)
 
-    def predict(self, x_input: Any) -> np.ndarray:
+    def predict(self, x_input: np.ndarray) -> np.ndarray:
         """Returns class predictions for the given input."""
         return np.asarray(self.classifier.predict(x_input))
 
-    def evaluate(self, x_test: Any, y_test: Any) -> dict[str, float]:
+    def evaluate(self, x_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
         """Computes accuracy, precision, recall, and F1 against test labels."""
         predictions = self.predict(x_test)
-        metrics: dict[str, float] = {
-            "accuracy": float(accuracy_score(y_test, predictions)),
-            "precision": float(precision_score(y_test, predictions, zero_division=0)),
-            "recall": float(recall_score(y_test, predictions, zero_division=0)),
-            "f1": float(f1_score(y_test, predictions, zero_division=0)),
-        }
+        metrics = self.compute_classification_metrics(y_test, predictions)
         self.logger.info("XGBoost metrics: %s", metrics)
         return metrics
 
-    def get_underlying_model(self) -> Any:
+    def get_underlying_model(self) -> object:
         """Returns the XGBClassifier instance."""
         return self.classifier
