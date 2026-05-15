@@ -26,7 +26,7 @@ def test_zero_samples(model: LightGBMModel) -> None:
     """Zero: Test training with zero samples."""
     x_empty = np.array([]).reshape(0, 5)
     y_empty = np.array([])
-    with pytest.raises((ValueError, Exception)):
+    with pytest.raises(ValueError):
         model.train(x_empty, y_empty)
 
 

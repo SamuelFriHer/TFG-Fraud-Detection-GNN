@@ -1,3 +1,5 @@
+"""Unit tests for the DataSyncManager class."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,7 +9,7 @@ from src.utils.data_manager import DataSyncManager
 
 @patch("src.utils.data_manager.HfApi")
 def test_data_manager_initialization(mock_hfapi: MagicMock) -> None:
-    # Test initialization cleanly grabs token or accepts it
+    """Verifies initialization grabs token and configures HfApi."""
     manager = DataSyncManager(token="fake_token")
     assert manager.token == "fake_token"
     mock_hfapi.assert_called_once_with(token="fake_token")
@@ -15,6 +17,7 @@ def test_data_manager_initialization(mock_hfapi: MagicMock) -> None:
 
 @patch("src.utils.data_manager.hf_hub_download")
 def test_download_dataset_file(mock_download: MagicMock) -> None:
+    """Verifies download_dataset_file delegates to hf_hub_download."""
     manager = DataSyncManager(token="fake_token")
     mock_download.return_value = "/fake/local/dir/dataset.csv"
 
@@ -30,12 +33,10 @@ def test_download_dataset_file(mock_download: MagicMock) -> None:
     )
 
 
-@patch("os.path.exists")
+@patch("src.utils.data_manager.Path.exists", return_value=True)
 @patch("src.utils.data_manager.HfApi")
 def test_upload_artifact(mock_api_class: MagicMock, mock_exists: MagicMock) -> None:
-    mock_exists.return_value = True
-
-    # Mocking HfApi instance
+    """Verifies upload_artifact delegates to HfApi.upload_file."""
     mock_api_instance = MagicMock()
     mock_api_class.return_value = mock_api_instance
     mock_api_instance.upload_file.return_value = "https://huggingface.co/fake/url"
@@ -53,9 +54,9 @@ def test_upload_artifact(mock_api_class: MagicMock, mock_exists: MagicMock) -> N
     )
 
 
-@patch("os.path.exists")
+@patch("src.utils.data_manager.Path.exists", return_value=False)
 def test_upload_missing_artifact(mock_exists: MagicMock) -> None:
-    mock_exists.return_value = False
+    """Verifies FileNotFoundError for missing artifacts."""
     manager = DataSyncManager(token="fake_token")
 
     with pytest.raises(FileNotFoundError):
