@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PyTorch
-RUN pip install --no-cache-dir torch torchvision torchaudio
+# Install PyTorch with CUDA 12 support
+RUN pip install --no-cache-dir torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # Install PyTorch Geometric
 RUN pip install --no-cache-dir torch_geometric

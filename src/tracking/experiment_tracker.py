@@ -42,8 +42,11 @@ class ExperimentTracker:
         self.logger.info("Logged metrics: %s", metrics)
 
     def log_model(self, model: Any, model_name: str) -> None:
-        """Persists the trained model via MLflow's native sklearn integration."""
-        mlflow.sklearn.log_model(model, name=model_name)
+        """Persists the trained model, supporting both sklearn and cuML backends."""
+        try:
+            mlflow.sklearn.log_model(model, name=model_name)
+        except TypeError:
+            mlflow.pyfunc.log_model(name=model_name, python_model=model)
         self.logger.info("Model artifact saved as '%s'", model_name)
 
     def end_run(self) -> None:
