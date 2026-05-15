@@ -29,7 +29,7 @@ class SVMModel(IClassificationModel, ClassificationMetricsMixin):
     def __init__(self, **kwargs: Any) -> None:
         """Initializes SVM with the best available backend."""
         self.logger = logging.getLogger(__name__)
-        defaults: dict[str, Any] = {"random_state": 42, "verbose": True}
+        defaults: dict[str, Any] = {"random_state": 42, "verbose": True, "shrinking": False}
         defaults.update(kwargs)
 
         if GpuAvailabilityChecker().is_cuml_available():
