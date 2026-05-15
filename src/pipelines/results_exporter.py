@@ -1,5 +1,6 @@
 """Downloads MLflow results from HF Hub and exports them to CSV for analysis."""
 
+import gzip
 import logging
 import os
 import tarfile
@@ -74,7 +75,7 @@ class ResultsExporter:
 
     def _download_archive(self, repo_id: str, archive_name: str) -> Path:
         """Downloads the MLflow tar.gz from the HF model repository."""
-        local_dir = str(PROJECT_ROOT / "outputs")
+        local_dir = str(PROJECT_ROOT / "outputs" / "archives")
         remote_path = f"mlflow/{archive_name}"
         downloaded = self.sync_manager.download_model_file(
             repo_id=repo_id,
@@ -84,10 +85,28 @@ class ResultsExporter:
         return Path(downloaded)
 
     def _extract_archive(self, archive_path: Path) -> None:
-        """Extracts the tar.gz archive into the outputs/ directory."""
+        """
+        Extracts the tar.gz archive into the outputs/ directory.
+        If the archive is corrupted, it is deleted to allow redownload.
+        """
         outputs_dir = PROJECT_ROOT / "outputs"
-        with tarfile.open(archive_path, "r:gz") as tar:
-            tar.extractall(path=outputs_dir)
+        self.logger.debug("Verifying and extracting archive: %s", archive_path)
+
+        try:
+            if not tarfile.is_tarfile(archive_path):
+                raise tarfile.ReadError(f"Not a valid tar file: {archive_path}")
+
+            with tarfile.open(archive_path, "r:gz") as tar:
+                tar.extractall(path=outputs_dir)
+        except (EOFError, tarfile.ReadError, gzip.BadGzipFile) as e:
+            self.logger.error("Corrupted archive detected at '%s': %s", archive_path, e)
+            if archive_path.exists():
+                self.logger.info("Deleting corrupted archive to allow redownload on next run.")
+                archive_path.unlink()
+            raise RuntimeError(
+                f"Archive extraction failed for {archive_path.name}. "
+                "The file was corrupted and has been deleted. Please retry the operation."
+            ) from e
 
     def _query_experiment(self, experiment_name: str) -> pd.DataFrame:
         """Queries the local MLflow SQLite store and returns all runs as a DataFrame."""
