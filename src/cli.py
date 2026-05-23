@@ -6,6 +6,7 @@ import sys
 from dotenv import load_dotenv
 
 from src.models.traditional import ALL_MODEL_NAMES
+from src.pipelines.gnn_pipeline import GNNPipeline
 from src.pipelines.results_exporter import ResultsExporter
 from src.pipelines.traditional_pipeline import TraditionalPipeline
 from src.utils.logger import ProjectLogger
@@ -30,6 +31,20 @@ def _build_traditional_parser(subparsers: argparse._SubParsersAction) -> None:  
         nargs="+",
         default=["all"],
         help="Models to train. Use 'all' for every registered model.",
+    )
+
+
+def _build_gnn_parser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore
+    """Registers the 'gnn' subcommand with its arguments."""
+    parser = subparsers.add_parser(
+        "gnn",
+        help="Run Graph Neural Network models (GraphSAGE, etc.).",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to the TOML experiment config file.",
     )
 
 
@@ -77,6 +92,14 @@ def _run_traditional(args: argparse.Namespace) -> None:
     pipeline.run(requested_models=model_names)
 
 
+def _run_gnn(args: argparse.Namespace) -> None:
+    """Handles execution of the GNN pipeline."""
+    logger = ProjectLogger.get_logger("CLI")
+    logger.info("Launching GNN pipeline — config: %s", args.config)
+    pipeline = GNNPipeline(config_path=args.config)
+    pipeline.run()
+
+
 def _run_fetch_results(args: argparse.Namespace) -> None:
     """Downloads the MLflow archive from HF Hub and exports runs to CSV."""
     logger = ProjectLogger.get_logger("CLI")
@@ -100,12 +123,14 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="pipeline", required=True)
 
     _build_traditional_parser(subparsers)
+    _build_gnn_parser(subparsers)
     _build_fetch_results_parser(subparsers)
 
     args = parser.parse_args()
 
     dispatch = {
         "traditional": _run_traditional,
+        "gnn": _run_gnn,
         "fetch-results": _run_fetch_results,
     }
 
