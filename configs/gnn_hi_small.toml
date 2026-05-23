@@ -1,0 +1,14 @@
+[dataset]
+handle = "ealtman2019/ibm-transactions-for-anti-money-laundering-aml"
+prefix = "HI-Small"
+
+[split]
+test_size = 0.4
+random_state = 42
+
+[models.GraphSAGE]
+hidden_channels = 64
+num_layers = 2
+learning_rate = 0.001
+epochs = 10
+batch_size = 2048
