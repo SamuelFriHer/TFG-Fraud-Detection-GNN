@@ -35,7 +35,11 @@ class DataPreprocessor:
         if not csv_path.exists():
             raise FileNotFoundError(f"Dataset path does not exist: {csv_path}")
 
-        return pl.read_csv(str(csv_path))
+        df = pl.read_csv(str(csv_path))
+        # Handle duplicate "Account" columns renamed by Polars
+        if "Account_duplicated_0" in df.columns:
+            df = df.rename({"Account_duplicated_0": "Account.1"})
+        return df
 
     def clean_data(self, df: pl.DataFrame) -> pl.DataFrame:
         """Drops rows with null values as basic cleaning for the IBM AML dataset."""

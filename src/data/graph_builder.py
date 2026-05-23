@@ -102,6 +102,10 @@ class AMLGraphBuilder:
         accounts_df = pl.read_csv(str(accounts_path))
         trans_df = pl.read_csv(str(trans_path))
 
+        # Handle duplicate "Account" columns renamed by Polars
+        if "Account_duplicated_0" in trans_df.columns:
+            trans_df = trans_df.rename({"Account_duplicated_0": "Account.1"})
+
         edge_index, valid_mask, _ = self._map_account_ids(accounts_df, trans_df)
 
         trans_df_valid = trans_df.filter(valid_mask)
