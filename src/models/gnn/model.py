@@ -59,7 +59,17 @@ class GNNFraudDetector:
             list(self.encoder.parameters()) + list(self.classifier.parameters()), lr=self.lr
         )
 
-        criterion = nn.BCEWithLogitsLoss()
+        # Calcular pos_weight dinámicamente para manejar desbalanceo de clases
+        num_pos = float((data.y == 1).sum().item())
+        num_neg = float((data.y == 0).sum().item())
+        if num_pos > 0:
+            weight_val = num_neg / num_pos
+            pos_weight = torch.tensor([weight_val], device=self.device)
+            self.logger.info("Weight for positive class: %.4f", weight_val)
+        else:
+            pos_weight = torch.tensor([1.0], device=self.device)
+
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loader = self._get_loader(data, is_train=True)
 
         for epoch in range(self.epochs):

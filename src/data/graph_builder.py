@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 import torch
-from sklearn.preprocessing import LabelEncoder  # type: ignore
+from sklearn.preprocessing import LabelEncoder, StandardScaler  # type: ignore
 from torch_geometric.data import Data  # type: ignore
 
 
@@ -94,6 +94,12 @@ class AMLGraphBuilder:
 
         return edge_index, valid_mask, account_series
 
+    def _scale_tensor(self, feature_tensor: torch.Tensor) -> torch.Tensor:
+        """Normaliza un tensor usando StandardScaler a media 0 y desviación 1."""
+        scaler = StandardScaler()
+        scaled_array = scaler.fit_transform(feature_tensor.numpy())
+        return torch.tensor(scaled_array, dtype=torch.float)
+
     def build_graph(self, dataset_dir: str, prefix: str) -> Data:
         """Construye y devuelve un objeto Data de PyTorch Geometric."""
         accounts_path = self._find_csv(dataset_dir, prefix, "accounts")
@@ -125,4 +131,8 @@ class AMLGraphBuilder:
 
         y = torch.tensor(trans_df_valid["Is Laundering"].to_numpy(), dtype=torch.long)
 
-        return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y)
+        # Normalizar características para evitar desbordamiento y mejorar gradientes
+        x_scaled = self._scale_tensor(x)
+        edge_attr_scaled = self._scale_tensor(edge_attr)
+
+        return Data(x=x_scaled, edge_index=edge_index, edge_attr=edge_attr_scaled, y=y)
