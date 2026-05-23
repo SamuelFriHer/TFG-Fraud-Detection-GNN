@@ -2,7 +2,15 @@
 
 import numpy as np
 import torch
-from sklearn.metrics import classification_report, roc_auc_score  # type: ignore
+from sklearn.metrics import (  # type: ignore
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from torch import nn, optim
 from torch_geometric.data import Data  # type: ignore
 from torch_geometric.loader import LinkNeighborLoader  # type: ignore
@@ -30,6 +38,7 @@ class GNNFraudDetector:
         self.lr = lr
         self.batch_size = batch_size
         self.epochs = epochs
+        self.threshold = 0.5
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.encoder.to(self.device)
@@ -110,22 +119,58 @@ class GNNFraudDetector:
 
         return np.concatenate(preds)
 
+    def _find_optimal_threshold(
+        self, y_true: np.ndarray, probs: np.ndarray
+    ) -> tuple[float, float]:
+        """Finds the decision threshold that maximizes the F1-Score.
+
+        Args:
+            y_true: Ground truth binary labels.
+            probs: Predicted probabilities.
+
+        Returns:
+            A tuple containing the optimal threshold and the best F1-Score.
+        """
+        precisions: np.ndarray
+        recalls: np.ndarray
+        thresholds: np.ndarray
+        precisions, recalls, thresholds = precision_recall_curve(y_true, probs)
+        f1_scores: np.ndarray = 2 * precisions * recalls / (precisions + recalls + 1e-10)
+        best_idx: int = int(np.argmax(f1_scores))
+        best_threshold: float = (
+            float(thresholds[best_idx]) if best_idx < len(thresholds) else 0.5
+        )
+        best_f1: float = float(f1_scores[best_idx])
+        return best_threshold, best_f1
+
     def evaluate(self, data: Data) -> dict[str, float]:
-        """Evalúa las predicciones sobre el grafo."""
-        probs = self.predict(data)
-        preds = (probs > 0.5).astype(int)
-        y_true = data.y.cpu().numpy()
+        """Evaluates predictions on the graph, optimizing the threshold for F1-Score."""
+        probs: np.ndarray = self.predict(data)
+        y_true: np.ndarray = data.y.cpu().numpy()
 
-        # Como usa neg_sampling durante eval, y_true debe ajustarse al orden del dataloader
-        # El loader en eval sin neg_sampling itera secuencialmente
+        optimal_threshold: float
+        best_f1: float
+        optimal_threshold, best_f1 = self._find_optimal_threshold(y_true, probs)
+        self.threshold = optimal_threshold
+        self.logger.info("Optimal threshold found: %.4f (Best F1: %.4f)", self.threshold, best_f1)
 
-        report = classification_report(y_true, preds, output_dict=True)
-        auc = roc_auc_score(y_true, probs)
+        preds: np.ndarray = (probs > self.threshold).astype(int)
 
-        metrics = {
-            "accuracy": report["accuracy"],
-            "f1_score": report["1"]["f1-score"],
-            "roc_auc": float(auc),
+        accuracy: float = float(accuracy_score(y_true, preds))
+        precision: float = float(precision_score(y_true, preds, zero_division=0))
+        recall: float = float(recall_score(y_true, preds, zero_division=0))
+        f1: float = float(f1_score(y_true, preds, zero_division=0))
+        roc_auc: float = float(roc_auc_score(y_true, probs))
+        pr_auc: float = float(average_precision_score(y_true, probs))
+
+        metrics: dict[str, float] = {
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1_score": f1,
+            "roc_auc": roc_auc,
+            "pr_auc": pr_auc,
+            "optimal_threshold": self.threshold,
         }
         return metrics
 
