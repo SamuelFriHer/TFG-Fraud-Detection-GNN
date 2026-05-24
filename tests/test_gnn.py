@@ -1,5 +1,6 @@
 """Tests unitarios para la arquitectura GNN y la construcción de grafos."""
 
+import os
 import polars as pl
 import pytest
 import torch
@@ -45,8 +46,6 @@ def test_graph_builder(mock_graph_data: tuple[pl.DataFrame, pl.DataFrame], tmp_p
     """Valida que el grafo se construye correctamente desde CSVs."""
     accounts, transactions = mock_graph_data
 
-    import os
-
     dataset_dir = os.path.join(tmp_path, "mock_dataset")
     os.makedirs(dataset_dir)
 
@@ -54,28 +53,41 @@ def test_graph_builder(mock_graph_data: tuple[pl.DataFrame, pl.DataFrame], tmp_p
     transactions.write_csv(os.path.join(dataset_dir, "Mock_Trans.csv"))
 
     builder = AMLGraphBuilder()
-    data = builder.build_graph(dataset_dir, "Mock")
+    data = builder.build_graph(dataset_dir, "Mock", test_size=0.4)
 
     assert isinstance(data, Data)
     assert data.num_nodes == 3
     assert data.num_edges == 2
     assert data.edge_index.shape == (2, 2)
     assert data.y.tolist() == [0, 1]
+    assert hasattr(data, "train_mask")
+    assert hasattr(data, "val_mask")
+    assert hasattr(data, "test_mask")
 
 
 def test_gnn_forward_pass() -> None:
     """Prueba que el modelo GNN realiza una pasada hacia adelante sin errores de dimensiones."""
     num_nodes = 5
-    node_feat_dim = 4
+    node_feat_dim = 10
     edge_feat_dim = 3
 
-    # Grafo sintético
     x = torch.rand((num_nodes, node_feat_dim))
     edge_index = torch.tensor([[0, 1, 2, 3], [1, 2, 3, 4]], dtype=torch.long)
     edge_attr = torch.rand((4, edge_feat_dim))
     y = torch.tensor([0, 1, 0, 1], dtype=torch.long)
+    train_mask = torch.tensor([True, True, False, False])
+    val_mask = torch.tensor([False, False, True, False])
+    test_mask = torch.tensor([False, False, False, True])
 
-    data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y)
+    data = Data(
+        x=x,
+        edge_index=edge_index,
+        edge_attr=edge_attr,
+        y=y,
+        train_mask=train_mask,
+        val_mask=val_mask,
+        test_mask=test_mask
+    )
 
     model = GNNFraudDetector(
         node_feat_dim=node_feat_dim,
@@ -86,14 +98,62 @@ def test_gnn_forward_pass() -> None:
         epochs=1,
     )
 
-    # Forzar ejecución en CPU para el test local
     model.device = torch.device("cpu")
     model.encoder.to("cpu")
     model.classifier.to("cpu")
 
-    # Evaluar que el pipeline entrena y predice sin crashes
     model.train(data)
-    preds = model.predict(data)
+    preds = model.predict(data, stage="test")
 
-    assert preds.shape == (4,)
+    assert preds.shape == (1,)
     assert all(0 <= p <= 1 for p in preds)
+
+
+def test_focal_loss() -> None:
+    """Valida que Focal Loss calcula pérdidas coherentes sin errores."""
+    from src.models.gnn.loss import FocalLoss
+
+    inputs = torch.tensor([0.5, -0.5, 2.0, -2.0])
+    targets = torch.tensor([1.0, 0.0, 1.0, 0.0])
+
+    loss_fn = FocalLoss(alpha=0.25, gamma=2.0)
+    loss = loss_fn(inputs, targets)
+
+    assert loss.dim() == 0
+    assert loss.item() > 0.0
+
+
+def test_gnn_weighted_sampler() -> None:
+    """Verifica que el dataloader de entrenamiento use WeightedRandomSampler."""
+    num_nodes = 5
+    node_feat_dim = 10
+    edge_feat_dim = 3
+
+    x = torch.rand((num_nodes, node_feat_dim))
+    edge_index = torch.tensor([[0, 1, 2, 3], [1, 2, 3, 4]], dtype=torch.long)
+    edge_attr = torch.rand((4, edge_feat_dim))
+    y = torch.tensor([0, 1, 0, 1], dtype=torch.long)
+    train_mask = torch.tensor([True, True, False, False])
+    val_mask = torch.tensor([False, False, True, False])
+    test_mask = torch.tensor([False, False, False, True])
+    data = Data(
+        x=x,
+        edge_index=edge_index,
+        edge_attr=edge_attr,
+        y=y,
+        train_mask=train_mask,
+        val_mask=val_mask,
+        test_mask=test_mask
+    )
+
+    model = GNNFraudDetector(
+        node_feat_dim=node_feat_dim,
+        edge_feat_dim=edge_feat_dim,
+        hidden_channels=8,
+        num_layers=2,
+        batch_size=2,
+        epochs=1,
+    )
+
+    loader = model._get_train_loader(data)
+    assert loader.sampler is not None
