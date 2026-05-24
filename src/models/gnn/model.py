@@ -35,9 +35,7 @@ class GNNFraudDetector:
         self.encoder = GATv2Encoder(
             node_feat_dim, edge_feat_dim, hidden_channels, num_layers, heads=heads
         )
-        self.classifier = EdgeClassifier(
-            hidden_channels * heads, edge_feat_dim, hidden_channels
-        )
+        self.classifier = EdgeClassifier(hidden_channels * heads, edge_feat_dim, hidden_channels)
         self.lr = lr
         self.batch_size = batch_size
         self.epochs = epochs
@@ -60,10 +58,7 @@ class GNNFraudDetector:
         train_y = data.y[data.train_mask]
 
         train_data = Data(
-            x=data.x,
-            edge_index=train_edge_index,
-            edge_attr=train_edge_attr,
-            y=train_y
+            x=data.x, edge_index=train_edge_index, edge_attr=train_edge_attr, y=train_y
         )
 
         y_label = train_y.cpu()
@@ -77,7 +72,7 @@ class GNNFraudDetector:
             weights[y_label == 1] = pos_w
             weights[y_label == 0] = neg_w
             sampler = WeightedRandomSampler(
-                weights=weights, num_samples=total_samples, replacement=True
+                weights=weights.tolist(), num_samples=total_samples, replacement=True
             )
             return LinkNeighborLoader(
                 train_data,
@@ -103,11 +98,7 @@ class GNNFraudDetector:
         train_edge_index = data.edge_index[:, data.train_mask]
         train_edge_attr = data.edge_attr[data.train_mask]
 
-        val_data = Data(
-            x=data.x,
-            edge_index=train_edge_index,
-            edge_attr=train_edge_attr
-        )
+        val_data = Data(x=data.x, edge_index=train_edge_index, edge_attr=train_edge_attr)
 
         val_edge_index = data.edge_index[:, data.val_mask]
         val_y = data.y[data.val_mask]
@@ -128,11 +119,7 @@ class GNNFraudDetector:
         history_edge_index = data.edge_index[:, history_mask]
         history_edge_attr = data.edge_attr[history_mask]
 
-        test_data = Data(
-            x=data.x,
-            edge_index=history_edge_index,
-            edge_attr=history_edge_attr
-        )
+        test_data = Data(x=data.x, edge_index=history_edge_index, edge_attr=history_edge_attr)
 
         test_edge_index = data.edge_index[:, data.test_mask]
         test_y = data.y[data.test_mask]
@@ -157,13 +144,12 @@ class GNNFraudDetector:
                 total = float(train_y.size(0))
                 alpha_val = 1.0 - (num_pos / total) if total > 0 else 0.5
             from src.models.gnn.loss import FocalLoss
+
             return FocalLoss(alpha=alpha_val, gamma=self.gamma)
 
         num_pos = float((train_y == 1).sum().item())
         num_neg = float((train_y == 0).sum().item())
-        pos_weight = torch.tensor(
-            [num_neg / num_pos] if num_pos > 0 else [1.0], device=self.device
-        )
+        pos_weight = torch.tensor([num_neg / num_pos] if num_pos > 0 else [1.0], device=self.device)
         return nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     def _train_epoch(
@@ -213,12 +199,18 @@ class GNNFraudDetector:
             if pr_auc > best_pr_auc:
                 best_pr_auc = pr_auc
                 best_enc_state = {k: v.cpu().clone() for k, v in self.encoder.state_dict().items()}
-                best_cls_state = {k: v.cpu().clone() for k, v in self.classifier.state_dict().items()}
-                self.logger.info("Best model updated at epoch %d (Val PR-AUC: %.4f)", epoch + 1, pr_auc)
+                best_cls_state = {
+                    k: v.cpu().clone() for k, v in self.classifier.state_dict().items()
+                }
+                self.logger.info(
+                    "Best model updated at epoch %d (Val PR-AUC: %.4f)", epoch + 1, pr_auc
+                )
 
         if best_enc_state is not None and best_cls_state is not None:
             self.encoder.load_state_dict({k: v.to(self.device) for k, v in best_enc_state.items()})
-            self.classifier.load_state_dict({k: v.to(self.device) for k, v in best_cls_state.items()})
+            self.classifier.load_state_dict(
+                {k: v.to(self.device) for k, v in best_cls_state.items()}
+            )
             self.logger.info("Restored best model weights with PR-AUC: %.4f", best_pr_auc)
 
     def predict(self, data: Data, stage: str = "val") -> np.ndarray:
@@ -265,7 +257,15 @@ class GNNFraudDetector:
             metrics = evaluate_predictions(probs, y_true)
             self.threshold = metrics["optimal_threshold"]
         else:
-            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, average_precision_score
+            from sklearn.metrics import (  # type: ignore[import-untyped]
+                accuracy_score,
+                average_precision_score,
+                f1_score,
+                precision_score,
+                recall_score,
+                roc_auc_score,
+            )
+
             preds = (probs > self.threshold).astype(int)
             metrics = {
                 "accuracy": float(accuracy_score(y_true, preds)),
@@ -279,7 +279,11 @@ class GNNFraudDetector:
 
         self.logger.info(
             "%s Stage - Threshold: %.4f, F1: %.4f, PR-AUC: %.4f, ROC-AUC: %.4f",
-            stage.capitalize(), self.threshold, metrics["f1_score"], metrics["pr_auc"], metrics["roc_auc"]
+            stage.capitalize(),
+            self.threshold,
+            metrics["f1_score"],
+            metrics["pr_auc"],
+            metrics["roc_auc"],
         )
         return metrics
 

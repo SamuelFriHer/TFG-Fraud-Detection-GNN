@@ -1,8 +1,10 @@
 """Focal Loss implementation for binary classification."""
 
+from typing import cast
+
 import torch
+import torch.nn.functional as functional_interface
 from torch import nn
-import torch.nn.functional as F
 
 
 class FocalLoss(nn.Module):
@@ -35,7 +37,7 @@ class FocalLoss(nn.Module):
             The computed Focal Loss.
         """
         probs = torch.sigmoid(inputs)
-        bce_loss = F.binary_cross_entropy_with_logits(
+        bce_loss = functional_interface.binary_cross_entropy_with_logits(
             inputs, targets.float(), reduction="none"
         )
         pt = targets * probs + (1 - targets) * (1 - probs)
@@ -44,7 +46,7 @@ class FocalLoss(nn.Module):
         loss = alpha_weight * focal_weight * bce_loss
 
         if self.reduction == "mean":
-            return loss.mean()
+            return cast(torch.Tensor, loss.mean())
         if self.reduction == "sum":
-            return loss.sum()
-        return loss
+            return cast(torch.Tensor, loss.sum())
+        return cast(torch.Tensor, loss)
