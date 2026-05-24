@@ -1,6 +1,7 @@
 """Módulo encargado de la construcción de grafos a partir de los datos tabulares AML."""
 
 from pathlib import Path
+
 import polars as pl
 import torch
 from sklearn.preprocessing import LabelEncoder, StandardScaler  # type: ignore
@@ -62,12 +63,13 @@ class AMLGraphBuilder:
 
         src_accounts = trans_df["From Bank"].cast(pl.String) + "_" + trans_df["Account"]
         dst_accounts = trans_df["To Bank"].cast(pl.String) + "_" + trans_df["Account.1"]
-        trans_df = trans_df.with_columns([
-            src_accounts.alias("From_Acc"),
-            dst_accounts.alias("To_Acc")
-        ])
+        trans_df = trans_df.with_columns(
+            [src_accounts.alias("From_Acc"), dst_accounts.alias("To_Acc")]
+        )
 
-        valid_mask = trans_df["From_Acc"].is_in(unique_accounts) & trans_df["To_Acc"].is_in(unique_accounts)
+        valid_mask = trans_df["From_Acc"].is_in(unique_accounts) & trans_df["To_Acc"].is_in(
+            unique_accounts
+        )
         trans_df_valid = trans_df.filter(valid_mask)
 
         trans_df_sorted = trans_df_valid.with_columns(
@@ -82,21 +84,25 @@ class AMLGraphBuilder:
         """Computes structural and financial statistics for nodes using training data only."""
         train_trans = trans_df.slice(0, train_cutoff)
 
-        out_agg = train_trans.group_by("From_Acc").agg([
-            pl.len().alias("out_degree"),
-            pl.col("Amount Paid").sum().alias("total_sent"),
-            pl.col("Amount Paid").mean().alias("avg_sent"),
-            pl.col("Amount Paid").max().alias("max_sent"),
-            pl.col("Amount Paid").min().alias("min_sent"),
-        ])
+        out_agg = train_trans.group_by("From_Acc").agg(
+            [
+                pl.len().alias("out_degree"),
+                pl.col("Amount Paid").sum().alias("total_sent"),
+                pl.col("Amount Paid").mean().alias("avg_sent"),
+                pl.col("Amount Paid").max().alias("max_sent"),
+                pl.col("Amount Paid").min().alias("min_sent"),
+            ]
+        )
 
-        in_agg = train_trans.group_by("To_Acc").agg([
-            pl.len().alias("in_degree"),
-            pl.col("Amount Received").sum().alias("total_received"),
-            pl.col("Amount Received").mean().alias("avg_received"),
-            pl.col("Amount Received").max().alias("max_received"),
-            pl.col("Amount Received").min().alias("min_received"),
-        ])
+        in_agg = train_trans.group_by("To_Acc").agg(
+            [
+                pl.len().alias("in_degree"),
+                pl.col("Amount Received").sum().alias("total_received"),
+                pl.col("Amount Received").mean().alias("avg_received"),
+                pl.col("Amount Received").max().alias("max_received"),
+                pl.col("Amount Received").min().alias("min_received"),
+            ]
+        )
 
         node_df = accounts_df.select(["Account_ID"])
         node_df = node_df.join(out_agg, left_on="Account_ID", right_on="From_Acc", how="left")
@@ -104,14 +110,28 @@ class AMLGraphBuilder:
         node_df = node_df.fill_null(0.0)
 
         financial_cols = [
-            "total_sent", "avg_sent", "max_sent", "min_sent",
-            "total_received", "avg_received", "max_received", "min_received"
+            "total_sent",
+            "avg_sent",
+            "max_sent",
+            "min_sent",
+            "total_received",
+            "avg_received",
+            "max_received",
+            "min_received",
         ]
         node_df = node_df.with_columns([pl.col(c).log1p() for c in financial_cols])
 
         feature_cols = [
-            "out_degree", "total_sent", "avg_sent", "max_sent", "min_sent",
-            "in_degree", "total_received", "avg_received", "max_received", "min_received"
+            "out_degree",
+            "total_sent",
+            "avg_sent",
+            "max_sent",
+            "min_sent",
+            "in_degree",
+            "total_received",
+            "avg_received",
+            "max_received",
+            "min_received",
         ]
         x_tensor = torch.tensor(node_df.select(feature_cols).to_numpy(), dtype=torch.float)
         return self._scale_tensor(x_tensor)
@@ -127,10 +147,13 @@ class AMLGraphBuilder:
             lambda x: self.account_id_map[x], return_dtype=pl.Int64
         )
 
-        edge_index = torch.stack([
-            torch.tensor(src_idx.to_numpy(), dtype=torch.long),
-            torch.tensor(dst_idx.to_numpy(), dtype=torch.long)
-        ], dim=0)
+        edge_index = torch.stack(
+            [
+                torch.tensor(src_idx.to_numpy(), dtype=torch.long),
+                torch.tensor(dst_idx.to_numpy(), dtype=torch.long),
+            ],
+            dim=0,
+        )
 
         n_edges = len(trans_df)
         train_cutoff = int(n_edges * (1.0 - test_size))
@@ -173,13 +196,20 @@ class AMLGraphBuilder:
             trans_df, test_size
         )
 
-        trans_df = trans_df.with_columns([
-            pl.col("Amount Received").log1p(),
-            pl.col("Amount Paid").log1p()
-        ])
+        trans_df = trans_df.with_columns(
+            [pl.col("Amount Received").log1p(), pl.col("Amount Paid").log1p()]
+        )
 
         edge_cols = ["Receiving Currency", "Payment Currency", "Payment Format"]
-        drop_cols = ["From Bank", "Account", "To Bank", "Account.1", "Is Laundering", "From_Acc", "To_Acc"]
+        drop_cols = [
+            "From Bank",
+            "Account",
+            "To Bank",
+            "Account.1",
+            "Is Laundering",
+            "From_Acc",
+            "To_Acc",
+        ]
         edge_features_df = trans_df.drop(drop_cols)
 
         edge_attr = self._encode_dataframe(edge_features_df, edge_cols, self.edge_encoders)
@@ -194,5 +224,5 @@ class AMLGraphBuilder:
             y=y,
             train_mask=train_mask,
             val_mask=val_mask,
-            test_mask=test_mask
+            test_mask=test_mask,
         )

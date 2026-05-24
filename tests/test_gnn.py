@@ -1,6 +1,7 @@
 """Tests unitarios para la arquitectura GNN y la construcción de grafos."""
 
 import os
+
 import polars as pl
 import pytest
 import torch
@@ -86,7 +87,7 @@ def test_gnn_forward_pass() -> None:
         y=y,
         train_mask=train_mask,
         val_mask=val_mask,
-        test_mask=test_mask
+        test_mask=test_mask,
     )
 
     model = GNNFraudDetector(
@@ -143,7 +144,7 @@ def test_gnn_weighted_sampler() -> None:
         y=y,
         train_mask=train_mask,
         val_mask=val_mask,
-        test_mask=test_mask
+        test_mask=test_mask,
     )
 
     model = GNNFraudDetector(

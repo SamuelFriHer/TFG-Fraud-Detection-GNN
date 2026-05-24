@@ -1,6 +1,7 @@
 """Definición de las capas y arquitecturas de red neuronal de grafos (GNN)."""
 
 import typing
+
 import torch
 import torch.nn.functional as functional_interface
 from torch import nn
@@ -10,7 +11,8 @@ from torch_geometric.nn import GATv2Conv  # type: ignore
 class GATv2Encoder(nn.Module):
     """Codificador de nodos basado en GATv2.
 
-    Aprende embeddings de los nodos agregando información de sus vecinos e incorporando atributos de arista.
+    Aprende embeddings de los nodos agregando información
+    de sus vecinos e incorporando atributos de arista.
     """
 
     def __init__(
