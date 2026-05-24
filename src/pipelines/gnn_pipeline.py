@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.data.graph_builder import AMLGraphBuilder
 from src.models.gnn.model import GNNFraudDetector
+from src.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import ProjectLogger
 
 
@@ -23,10 +24,14 @@ class GNNPipeline:
         self.prefix = self.config["dataset"]["prefix"]
 
     def run(self) -> None:
-        """Ejecuta el pipeline completo."""
+        """Ejecuta el pipeline completo, registrando parámetros y métricas en MLflow."""
+        experiment_name = f"gnn_{self.prefix}"
+        tracker = ExperimentTracker(experiment_name)
+
         self.logger.info("Iniciando construcción del grafo para %s", self.prefix)
         builder = AMLGraphBuilder()
-        data = builder.build_graph(str(self.dataset_dir), self.prefix)
+        test_size = float(self.config.get("split", {}).get("test_size", 0.4))
+        data = builder.build_graph(str(self.dataset_dir), self.prefix, test_size=test_size)
 
         node_dim = data.x.size(1)
         edge_dim = data.edge_attr.size(1)
@@ -34,21 +39,39 @@ class GNNPipeline:
 
         gnn_config = self.config["models"]["GraphSAGE"]
 
-        self.logger.info("Instanciando GNNFraudDetector")
+        self.logger.info("Instanciando GNNFraudDetector (GATv2)")
         model = GNNFraudDetector(
             node_feat_dim=node_dim,
             edge_feat_dim=edge_dim,
-            hidden_channels=gnn_config["hidden_channels"],
-            num_layers=gnn_config["num_layers"],
-            lr=gnn_config["learning_rate"],
-            batch_size=gnn_config["batch_size"],
-            epochs=gnn_config["epochs"],
+            hidden_channels=gnn_config.get("hidden_channels", 64),
+            num_layers=gnn_config.get("num_layers", 2),
+            lr=gnn_config.get("learning_rate", 0.001),
+            batch_size=gnn_config.get("batch_size", 2048),
+            epochs=gnn_config.get("epochs", 10),
+            aggr=gnn_config.get("aggr", "max"),
+            loss_type=gnn_config.get("loss_type", "focal"),
+            alpha=gnn_config.get("alpha"),
+            gamma=gnn_config.get("gamma", 2.0),
+            num_neighbors=gnn_config.get("num_neighbors", [5, 5]),
         )
+
+        tracker.start_run(run_name="GATv2")
+        tracker.log_params(gnn_config)
 
         self.logger.info("Entrenando el modelo...")
         model.train(data)
 
-        self.logger.info("Evaluando modelo (sobre el mismo grafo para prototipo)...")
-        # Idealmente dividiríamos los edges de train/val/test en el data_builder
-        metrics = model.evaluate(data)
-        self.logger.info("Métricas finales: %s", metrics)
+        self.logger.info("Evaluando sobre el split de validación...")
+        val_metrics = model.evaluate(data, stage="val")
+        tracker.log_metrics({f"val_{key}": value for key, value in val_metrics.items()})
+
+        self.logger.info("Evaluando sobre el split de test...")
+        test_metrics = model.evaluate(data, stage="test")
+        tracker.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
+
+        tracker.log_model(model.get_underlying_model(), model_name="GATv2_model")
+        tracker.end_run()
+
+        self.logger.info("Subiendo resultados al hub...")
+        tracker.upload_results_to_hub()
+        self.logger.info("Pipeline de GNN completado.")
