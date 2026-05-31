@@ -213,3 +213,10 @@ outputs/
 
 # MLflow tracking
 mlruns/
+
+# Documentation
+docs/
+
+# Logs
+logs/
+logs.*
