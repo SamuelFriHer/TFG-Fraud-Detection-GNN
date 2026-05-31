@@ -1,11 +1,11 @@
 """Pipeline de entrenamiento y evaluación para modelos GNN."""
 
 import tomllib
-from pathlib import Path
 
 from src.data.graph_builder import AMLGraphBuilder
 from src.models.gnn.model import GNNFraudDetector
 from src.tracking.experiment_tracker import ExperimentTracker
+from src.utils.data_manager import DataSyncManager
 from src.utils.logger import ProjectLogger
 
 
@@ -18,9 +18,7 @@ class GNNPipeline:
         with open(config_path, "rb") as f:
             self.config = tomllib.load(f)
 
-        self.dataset_dir = (
-            Path(".cache/kagglehub/datasets") / self.config["dataset"]["handle"] / "versions/8"
-        )
+        self.sync_manager = DataSyncManager()
         self.prefix = self.config["dataset"]["prefix"]
 
     def run(self) -> None:
@@ -28,10 +26,13 @@ class GNNPipeline:
         experiment_name = f"gnn_{self.prefix}"
         tracker = ExperimentTracker(experiment_name)
 
+        self.logger.info("Descargando/Verificando dataset %s...", self.config["dataset"]["handle"])
+        dataset_dir = self.sync_manager.download_kaggle_dataset(self.config["dataset"]["handle"])
+
         self.logger.info("Iniciando construcción del grafo para %s", self.prefix)
         builder = AMLGraphBuilder()
         test_size = float(self.config.get("split", {}).get("test_size", 0.4))
-        data = builder.build_graph(str(self.dataset_dir), self.prefix, test_size=test_size)
+        data = builder.build_graph(dataset_dir, self.prefix, test_size=test_size)
 
         node_dim = data.x.size(1)
         edge_dim = data.edge_attr.size(1)
