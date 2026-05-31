@@ -1,18 +1,19 @@
-"""Definición de las capas y arquitecturas de red neuronal de grafos (GNN)."""
+"""Definición de las capas y arquitecturas de red neuronal de grafos (GNN) tipo MEGA-PNA."""
 
 import typing
 
 import torch
 import torch.nn.functional as functional_interface
 from torch import nn
-from torch_geometric.nn import GATv2Conv  # type: ignore
+from torch_geometric.nn import PNAConv  # type: ignore
+from torch_scatter import scatter  # type: ignore
 
 
-class GATv2Encoder(nn.Module):
-    """Codificador de nodos basado en GATv2.
+class MEGAPNAEncoder(nn.Module):
+    """Codificador de nodos basado en MEGA-PNA.
 
-    Aprende embeddings de los nodos agregando información
-    de sus vecinos e incorporando atributos de arista.
+    Implementa agregación en dos etapas (Multi-Edge y Neighborhood),
+    paso de mensajes inverso (reverse_mp) y actualización de aristas (emlps).
     """
 
     def __init__(
@@ -21,46 +22,139 @@ class GATv2Encoder(nn.Module):
         edge_dim: int,
         hidden_channels: int,
         num_layers: int,
-        heads: int = 4,
-        concat: bool = True,
+        deg: torch.Tensor,
     ) -> None:
-        """Inicializa las capas convolucionales GATv2."""
+        """Inicializa las capas MEGA-PNA."""
         super().__init__()
+        self.num_layers = num_layers
+
+        # Después de flatten_edges: edge_dim * 4 (mean, max, min, std)
+        # Después de reverse_mp: + 1 (flag de dirección)
+        self.processed_edge_dim = (edge_dim * 4) + 1
+
         self.convs = nn.ModuleList()
-        self.concat = concat
-        self.heads = heads
+        self.edge_mlps = nn.ModuleList()
 
-        self.convs.append(
-            GATv2Conv(
-                in_channels,
-                hidden_channels,
-                heads=heads,
-                concat=concat,
-                edge_dim=edge_dim,
-            )
-        )
+        aggregators = ["mean", "min", "max", "std"]
+        scalers = ["identity", "amplification", "attenuation"]
 
-        out_dim = hidden_channels * heads if concat else hidden_channels
-        for _ in range(num_layers - 1):
+        # Node projection para ajustar in_channels a hidden_channels si difieren
+        self.node_proj = nn.Linear(in_channels, hidden_channels)
+
+        current_in_channels = hidden_channels
+        current_edge_dim = self.processed_edge_dim
+
+        for i in range(num_layers):
             self.convs.append(
-                GATv2Conv(
-                    out_dim,
-                    hidden_channels,
-                    heads=heads,
-                    concat=concat,
-                    edge_dim=edge_dim,
+                PNAConv(
+                    in_channels=current_in_channels,
+                    out_channels=hidden_channels,
+                    aggregators=aggregators,
+                    scalers=scalers,
+                    deg=deg,
+                    edge_dim=current_edge_dim,
                 )
             )
+
+            # MLP para actualizar atributos de arista (emlps)
+            # Entrada: arista_actual + src_node + dst_node
+            mlp_in_dim = current_edge_dim + (hidden_channels * 2)
+            self.edge_mlps.append(
+                nn.Sequential(
+                    nn.Linear(mlp_in_dim, hidden_channels),
+                    nn.ReLU(),
+                    nn.Linear(hidden_channels, hidden_channels),
+                )
+            )
+            current_in_channels = hidden_channels
+            current_edge_dim = hidden_channels
+
+    def _flatten_edges(
+        self, edge_index: torch.Tensor, edge_attr: torch.Tensor, num_nodes: int
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Agregación de aristas múltiples (Multi-Edge Aggregation)."""
+        edge_idx_1d = edge_index[0] * num_nodes + edge_index[1]
+        unique_edge_idx_1d, inverse_indices = torch.unique(edge_idx_1d, return_inverse=True)
+
+        mean_attr = scatter(edge_attr, inverse_indices, dim=0, reduce="mean")
+        max_attr = scatter(edge_attr, inverse_indices, dim=0, reduce="max")
+        min_attr = scatter(edge_attr, inverse_indices, dim=0, reduce="min")
+
+        # Varianza y std
+        mean_sq = scatter(edge_attr**2, inverse_indices, dim=0, reduce="mean")
+        var_attr = mean_sq - (mean_attr**2)
+        std_attr = torch.sqrt(torch.clamp(var_attr, min=1e-6))
+
+        flat_edge_attr = torch.cat([mean_attr, max_attr, min_attr, std_attr], dim=-1)
+
+        src = unique_edge_idx_1d // num_nodes
+        dst = unique_edge_idx_1d % num_nodes
+        flat_edge_index = torch.stack([src, dst], dim=0)
+
+        return flat_edge_index, flat_edge_attr
+
+    def _reverse_mp(
+        self, edge_index: torch.Tensor, edge_attr: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Inyección de aristas inversas para paso de mensajes bidireccional."""
+        num_edges = edge_index.size(1)
+        device = edge_index.device
+        dtype = edge_attr.dtype
+
+        fwd_flags = torch.ones((num_edges, 1), device=device, dtype=dtype)
+        rev_flags = torch.zeros((num_edges, 1), device=device, dtype=dtype)
+
+        rev_edge_index = edge_index[[1, 0]]
+
+        final_edge_index = torch.cat([edge_index, rev_edge_index], dim=1)
+
+        fwd_attr = torch.cat([edge_attr, fwd_flags], dim=-1)
+        rev_attr = torch.cat([edge_attr, rev_flags], dim=-1)
+        final_edge_attr = torch.cat([fwd_attr, rev_attr], dim=0)
+
+        return final_edge_index, final_edge_attr
 
     def forward(
         self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor
     ) -> torch.Tensor:
-        """Realiza el paso forward a través de las capas GATv2."""
-        for i, conv in enumerate(self.convs):
-            x = conv(x, edge_index, edge_attr)
-            if i != len(self.convs) - 1:
-                x = x.relu()
-                x = functional_interface.dropout(x, p=0.5, training=self.training)
+        """Realiza el paso forward a través de las capas MEGA-PNA."""
+        num_nodes = x.size(0)
+
+        # 1. Multi-Edge Aggregation
+        flat_edge_index, flat_edge_attr = self._flatten_edges(edge_index, edge_attr, num_nodes)
+
+        # 2. Reverse Message Passing
+        processed_edge_index, processed_edge_attr = self._reverse_mp(
+            flat_edge_index, flat_edge_attr
+        )
+
+        # Proyección inicial de nodos
+        x = self.node_proj(x)
+        x = functional_interface.relu(x)
+
+        curr_edge_index = processed_edge_index
+        curr_edge_attr = processed_edge_attr
+
+        # 3. Neighborhood Aggregation y Edge Updates (emlps)
+        for i in range(self.num_layers):
+            conv = self.convs[i]
+            edge_mlp = self.edge_mlps[i]
+
+            # PNA Conv
+            x_new = conv(x, curr_edge_index, curr_edge_attr)
+            x_new = functional_interface.relu(x_new)
+            x = functional_interface.dropout(x_new, p=0.5, training=self.training)
+
+            # Edge Updates (emlps)
+            src_nodes = curr_edge_index[0]
+            dst_nodes = curr_edge_index[1]
+            x_src = x[src_nodes]
+            x_dst = x[dst_nodes]
+
+            mlp_in = torch.cat([curr_edge_attr, x_src, x_dst], dim=-1)
+            new_edge_attr = edge_mlp(mlp_in)
+            curr_edge_attr = functional_interface.relu(new_edge_attr)
+
         return typing.cast(torch.Tensor, x)
 
 

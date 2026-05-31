@@ -6,9 +6,10 @@ from torch import nn, optim
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import Data  # type: ignore
 from torch_geometric.loader import LinkNeighborLoader  # type: ignore
+from torch_geometric.utils import degree  # type: ignore
 
 from src.models.gnn.evaluator import evaluate_predictions
-from src.models.gnn.layers import EdgeClassifier, GATv2Encoder
+from src.models.gnn.layers import EdgeClassifier, MEGAPNAEncoder
 from src.utils.logger import ProjectLogger
 
 
@@ -17,6 +18,7 @@ class GNNFraudDetector:
 
     def __init__(
         self,
+        data: Data,
         node_feat_dim: int,
         edge_feat_dim: int,
         hidden_channels: int = 64,
@@ -31,11 +33,16 @@ class GNNFraudDetector:
         num_neighbors: list[int] | None = None,
     ) -> None:
         """Initializes components and training configurations."""
-        heads = 4
-        self.encoder = GATv2Encoder(
-            node_feat_dim, edge_feat_dim, hidden_channels, num_layers, heads=heads
+        # Calculate degree histogram for PNAConv
+        train_edge_index = data.edge_index[:, data.train_mask]
+        in_degree = degree(train_edge_index[1], data.num_nodes, dtype=torch.long)
+        deg = torch.bincount(in_degree)
+
+        # Inyectamos 1 dimensión más para el Ego ID
+        self.encoder = MEGAPNAEncoder(
+            node_feat_dim + 1, edge_feat_dim, hidden_channels, num_layers, deg=deg
         )
-        self.classifier = EdgeClassifier(hidden_channels * heads, edge_feat_dim, hidden_channels)
+        self.classifier = EdgeClassifier(hidden_channels, edge_feat_dim, hidden_channels)
         self.lr = lr
         self.batch_size = batch_size
         self.epochs = epochs
@@ -165,7 +172,15 @@ class GNNFraudDetector:
         for batch in loader:
             batch = batch.to(self.device)
             optimizer.zero_grad()
-            z = self.encoder(batch.x, batch.edge_index, batch.edge_attr)
+
+            # Ego ID Injection
+            num_nodes = batch.x.size(0)
+            ego_flag = torch.zeros((num_nodes, 1), device=self.device, dtype=batch.x.dtype)
+            ego_flag[batch.edge_label_index[0]] = 1.0
+            ego_flag[batch.edge_label_index[1]] = 1.0
+            batch_x = torch.cat([batch.x, ego_flag], dim=-1)
+
+            z = self.encoder(batch_x, batch.edge_index, batch.edge_attr)
             seed_edge_attr = train_edge_attr[batch.input_id].to(self.device)
             out = self.classifier(z, batch.edge_label_index, seed_edge_attr)
             loss = criterion(out, batch.edge_label.float())
@@ -234,7 +249,15 @@ class GNNFraudDetector:
         with torch.no_grad():
             for batch in loader:
                 batch = batch.to(self.device)
-                z = self.encoder(batch.x, batch.edge_index, batch.edge_attr)
+
+                # Ego ID Injection
+                num_nodes = batch.x.size(0)
+                ego_flag = torch.zeros((num_nodes, 1), device=self.device, dtype=batch.x.dtype)
+                ego_flag[batch.edge_label_index[0]] = 1.0
+                ego_flag[batch.edge_label_index[1]] = 1.0
+                batch_x = torch.cat([batch.x, ego_flag], dim=-1)
+
+                z = self.encoder(batch_x, batch.edge_index, batch.edge_attr)
                 seed_edge_attr = edge_attr[batch.input_id].to(self.device)
                 out = self.classifier(z, batch.edge_label_index, seed_edge_attr)
                 preds.append(torch.sigmoid(out).cpu().numpy())

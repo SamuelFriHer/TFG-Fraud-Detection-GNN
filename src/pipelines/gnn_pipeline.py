@@ -39,8 +39,9 @@ class GNNPipeline:
 
         gnn_config = self.config["models"]["GraphSAGE"]
 
-        self.logger.info("Instanciando GNNFraudDetector (GATv2)")
+        self.logger.info("Instanciando GNNFraudDetector (MEGA-PNA)")
         model = GNNFraudDetector(
+            data=data,
             node_feat_dim=node_dim,
             edge_feat_dim=edge_dim,
             hidden_channels=gnn_config.get("hidden_channels", 64),
@@ -55,7 +56,7 @@ class GNNPipeline:
             num_neighbors=gnn_config.get("num_neighbors", [5, 5]),
         )
 
-        tracker.start_run(run_name="GATv2")
+        tracker.start_run(run_name="MEGA_PNA")
         tracker.log_params(gnn_config)
 
         self.logger.info("Entrenando el modelo...")
@@ -69,7 +70,7 @@ class GNNPipeline:
         test_metrics = model.evaluate(data, stage="test")
         tracker.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
 
-        tracker.log_model(model.get_underlying_model(), model_name="GATv2_model")
+        tracker.log_model(model.get_underlying_model(), model_name="MEGA_PNA_model")
         tracker.end_run()
 
         self.logger.info("Subiendo resultados al hub...")
