@@ -25,6 +25,7 @@ dependencies = [
     "torch-geometric>=2.5,<3",
     "pyg-lib>=0.4.0",
     "torch-sparse>=0.6.18",
+    "torch-scatter>=2.1.2,<3",
 
     # Explainability (XAI)
     "shap>=0.45,<1",
