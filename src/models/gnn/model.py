@@ -181,7 +181,7 @@ class GNNFraudDetector:
             batch_x = torch.cat([batch.x, ego_flag], dim=-1)
 
             z = self.encoder(batch_x, batch.edge_index, batch.edge_attr)
-            seed_edge_attr = train_edge_attr[batch.input_id].to(self.device)
+            seed_edge_attr = train_edge_attr[batch.input_id.cpu()].to(self.device)
             out = self.classifier(z, batch.edge_label_index, seed_edge_attr)
             loss = criterion(out, batch.edge_label.float())
             loss.backward()
@@ -258,7 +258,7 @@ class GNNFraudDetector:
                 batch_x = torch.cat([batch.x, ego_flag], dim=-1)
 
                 z = self.encoder(batch_x, batch.edge_index, batch.edge_attr)
-                seed_edge_attr = edge_attr[batch.input_id].to(self.device)
+                seed_edge_attr = edge_attr[batch.input_id.cpu()].to(self.device)
                 out = self.classifier(z, batch.edge_label_index, seed_edge_attr)
                 preds.append(torch.sigmoid(out).cpu().numpy())
         return np.concatenate(preds)
