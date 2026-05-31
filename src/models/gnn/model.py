@@ -143,20 +143,13 @@ class GNNFraudDetector:
 
     def _prepare_loss_criterion(self, data: Data) -> nn.Module:
         """Prepares the loss function based on config."""
-        train_y = data.y[data.train_mask]
         if self.loss_type == "focal":
-            alpha_val = self.alpha
-            if alpha_val is None:
-                num_pos = float((train_y == 1).sum().item())
-                total = float(train_y.size(0))
-                alpha_val = 1.0 - (num_pos / total) if total > 0 else 0.5
+            alpha_val = self.alpha if self.alpha is not None else 0.5
             from src.models.gnn.loss import FocalLoss
 
             return FocalLoss(alpha=alpha_val, gamma=self.gamma)
 
-        num_pos = float((train_y == 1).sum().item())
-        num_neg = float((train_y == 0).sum().item())
-        pos_weight = torch.tensor([num_neg / num_pos] if num_pos > 0 else [1.0], device=self.device)
+        pos_weight = torch.tensor([1.0], device=self.device)
         return nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     def _train_epoch(
