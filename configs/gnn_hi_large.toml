@@ -7,11 +7,13 @@ test_size = 0.4
 random_state = 42
 
 [models.GraphSAGE]
-hidden_channels = 64
+hidden_channels = 128
 num_layers = 2
 learning_rate = 0.001
-epochs = 10
+epochs = 80
 batch_size = 8192
-aggr = "max"
-loss_type = "focal"
-gamma = 2.0
+loss_type = "weighted"
+pos_weight = 5.0
+dropout = 0.1
+final_dropout = 0.1
+num_neighbors = [20, 10]

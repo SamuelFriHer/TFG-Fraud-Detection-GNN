@@ -23,10 +23,12 @@ class MEGAPNAEncoder(nn.Module):
         hidden_channels: int,
         num_layers: int,
         deg: torch.Tensor,
+        dropout: float = 0.1,
     ) -> None:
         """Inicializa las capas MEGA-PNA."""
         super().__init__()
         self.num_layers = num_layers
+        self.dropout = dropout
 
         # Después de flatten_edges: edge_dim * 4 (mean, max, min, std)
         # Después de reverse_mp: + 1 (flag de dirección)
@@ -143,7 +145,8 @@ class MEGAPNAEncoder(nn.Module):
             # PNA Conv
             x_new = conv(x, curr_edge_index, curr_edge_attr)
             x_new = functional_interface.relu(x_new)
-            x = functional_interface.dropout(x_new, p=0.5, training=self.training)
+            x_new = x_new + x
+            x = functional_interface.dropout(x_new, p=self.dropout, training=self.training)
 
             # Edge Updates (emlps)
             src_nodes = curr_edge_index[0]
@@ -161,7 +164,9 @@ class MEGAPNAEncoder(nn.Module):
 class EdgeClassifier(nn.Module):
     """Clasificador de aristas (transacciones) usando embeddings de nodos y atributos."""
 
-    def __init__(self, node_emb_dim: int, edge_attr_dim: int, hidden_dim: int) -> None:
+    def __init__(
+        self, node_emb_dim: int, edge_attr_dim: int, hidden_dim: int, final_dropout: float = 0.1
+    ) -> None:
         """Inicializa el MLP de clasificación."""
         super().__init__()
         in_dim = (node_emb_dim * 2) + edge_attr_dim
@@ -169,10 +174,10 @@ class EdgeClassifier(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
+            nn.Dropout(p=final_dropout),
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
+            nn.Dropout(p=final_dropout),
             nn.Linear(hidden_dim // 2, 1),
         )
 

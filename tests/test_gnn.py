@@ -91,6 +91,7 @@ def test_gnn_forward_pass() -> None:
     )
 
     model = GNNFraudDetector(
+        data=data,
         node_feat_dim=node_feat_dim,
         edge_feat_dim=edge_feat_dim,
         hidden_channels=8,
@@ -110,14 +111,14 @@ def test_gnn_forward_pass() -> None:
     assert all(0 <= p <= 1 for p in preds)
 
 
-def test_focal_loss() -> None:
-    """Valida que Focal Loss calcula pérdidas coherentes sin errores."""
-    from src.models.gnn.loss import FocalLoss
+def test_weighted_bce_loss() -> None:
+    """Valida que Weighted BCE Loss calcula pérdidas coherentes sin errores."""
+    from src.models.gnn.loss import build_weighted_bce_loss
 
     inputs = torch.tensor([0.5, -0.5, 2.0, -2.0])
     targets = torch.tensor([1.0, 0.0, 1.0, 0.0])
 
-    loss_fn = FocalLoss(alpha=0.25, gamma=2.0)
+    loss_fn = build_weighted_bce_loss(5.0, torch.device("cpu"))
     loss = loss_fn(inputs, targets)
 
     assert loss.dim() == 0
@@ -148,6 +149,7 @@ def test_gnn_weighted_sampler() -> None:
     )
 
     model = GNNFraudDetector(
+        data=data,
         node_feat_dim=node_feat_dim,
         edge_feat_dim=edge_feat_dim,
         hidden_channels=8,

@@ -49,12 +49,11 @@ class GNNPipeline:
             num_layers=gnn_config.get("num_layers", 2),
             lr=gnn_config.get("learning_rate", 0.001),
             batch_size=gnn_config.get("batch_size", 2048),
-            epochs=gnn_config.get("epochs", 10),
-            aggr=gnn_config.get("aggr", "max"),
-            loss_type=gnn_config.get("loss_type", "focal"),
-            alpha=gnn_config.get("alpha"),
-            gamma=gnn_config.get("gamma", 2.0),
-            num_neighbors=gnn_config.get("num_neighbors", [5, 5]),
+            epochs=gnn_config.get("epochs", 80),
+            pos_weight=gnn_config.get("pos_weight", None),
+            dropout=gnn_config.get("dropout", 0.1),
+            final_dropout=gnn_config.get("final_dropout", 0.1),
+            num_neighbors=gnn_config.get("num_neighbors", [20, 10]),
         )
 
         tracker.start_run(run_name="MEGA_PNA")
