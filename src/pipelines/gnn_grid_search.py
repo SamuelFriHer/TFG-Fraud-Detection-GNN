@@ -82,15 +82,15 @@ class GNNGridSearchPipeline:
                 data=data,
                 node_feat_dim=node_dim,
                 edge_feat_dim=edge_dim,
-                hidden_channels=int(params["hidden_channels"]),
-                num_layers=base_gnn_config.get("num_layers", 2),
-                lr=float(params["learning_rate"]),
-                batch_size=base_gnn_config.get("batch_size", 2048),
-                epochs=base_gnn_config.get("epochs", 80),
-                pos_weight=float(params["pos_weight"]),
-                dropout=float(params["dropout"]),
-                final_dropout=float(params["dropout"]),  # Usa el mismo dropout final
-                num_neighbors=params["num_neighbors"],  # type: ignore[arg-type]
+                hidden_channels=int(full_params["hidden_channels"]),
+                num_layers=int(full_params.get("num_layers", 2)),
+                lr=float(full_params["learning_rate"]),
+                batch_size=int(full_params.get("batch_size", 2048)),
+                epochs=int(full_params.get("epochs", 80)),
+                pos_weight=float(full_params["pos_weight"]),
+                dropout=float(full_params["dropout"]),
+                final_dropout=float(full_params.get("final_dropout", full_params["dropout"])),
+                num_neighbors=full_params["num_neighbors"],  # type: ignore[arg-type]
             )
 
             try:
