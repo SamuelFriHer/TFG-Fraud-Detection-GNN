@@ -6,6 +6,7 @@ import sys
 from dotenv import load_dotenv
 
 from src.models.traditional import ALL_MODEL_NAMES
+from src.pipelines.gnn_grid_search import GNNGridSearchPipeline
 from src.pipelines.gnn_pipeline import GNNPipeline
 from src.pipelines.results_exporter import ResultsExporter
 from src.pipelines.traditional_pipeline import TraditionalPipeline
@@ -45,6 +46,20 @@ def _build_gnn_parser(subparsers: argparse._SubParsersAction) -> None:  # type: 
         type=str,
         required=True,
         help="Path to the TOML experiment config file.",
+    )
+
+
+def _build_gnn_grid_parser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore
+    """Registers the 'gnn-grid' subcommand with its arguments."""
+    parser = subparsers.add_parser(
+        "gnn-grid",
+        help="Run automated hyperparameter Grid Search for GNN models.",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to the base TOML experiment config file.",
     )
 
 
@@ -100,6 +115,14 @@ def _run_gnn(args: argparse.Namespace) -> None:
     pipeline.run()
 
 
+def _run_gnn_grid(args: argparse.Namespace) -> None:
+    """Handles execution of the GNN Grid Search pipeline."""
+    logger = ProjectLogger.get_logger("CLI")
+    logger.info("Launching GNN Grid Search pipeline — base config: %s", args.config)
+    pipeline = GNNGridSearchPipeline(config_path=args.config)
+    pipeline.run()
+
+
 def _run_fetch_results(args: argparse.Namespace) -> None:
     """Downloads the MLflow archive from HF Hub and exports runs to CSV."""
     logger = ProjectLogger.get_logger("CLI")
@@ -124,6 +147,7 @@ def main() -> None:
 
     _build_traditional_parser(subparsers)
     _build_gnn_parser(subparsers)
+    _build_gnn_grid_parser(subparsers)
     _build_fetch_results_parser(subparsers)
 
     args = parser.parse_args()
@@ -131,6 +155,7 @@ def main() -> None:
     dispatch = {
         "traditional": _run_traditional,
         "gnn": _run_gnn,
+        "gnn-grid": _run_gnn_grid,
         "fetch-results": _run_fetch_results,
     }
 

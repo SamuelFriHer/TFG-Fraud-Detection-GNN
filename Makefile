@@ -29,6 +29,12 @@ run-gnn:
 run-gnn-large:
 	python -m src.cli gnn --config configs/gnn_hi_large.toml
 
+run-gnn-grid:
+	python -m src.cli gnn-grid --config configs/gnn_hi_small.toml
+
+run-gnn-grid-large:
+	python -m src.cli gnn-grid --config configs/gnn_hi_large.toml
+
 # Downloads MLflow results from HF Hub and exports them to outputs/results/<experiment>_results.csv
 # Usage: make fetch-results EXPERIMENT=traditional_HI-Small
 fetch-results:
