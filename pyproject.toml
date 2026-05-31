@@ -21,11 +21,10 @@ dependencies = [
 
     # Graph manipulation
     "networkx>=3,<4",
-    "torch>=2.2,<3",
+    "torch==2.4.1",
+    "torchvision==0.19.1",
+    "torchaudio==2.4.1",
     "torch-geometric>=2.5,<3",
-    "pyg-lib>=0.4.0",
-    "torch-sparse>=0.6.18",
-    "torch-scatter>=2.1.2,<3",
 
     # Explainability (XAI)
     "shap>=0.45,<1",
@@ -43,7 +42,8 @@ dependencies = [
 
     # Cloud storage
     "huggingface_hub>=1.9,<2",
-    "kagglehub>=1.0,<2",
+    "kagglehub==1.0.0",
+    "kagglesdk==0.1.21",
 ]
 
 [project.optional-dependencies]
