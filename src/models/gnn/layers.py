@@ -5,8 +5,8 @@ import typing
 import torch
 import torch.nn.functional as functional_interface
 from torch import nn
-from torch_geometric.nn import PNAConv  # type: ignore
-from torch_scatter import scatter  # type: ignore
+from torch_geometric.nn import PNAConv
+from torch_scatter import scatter
 
 
 class MEGAPNAEncoder(nn.Module):

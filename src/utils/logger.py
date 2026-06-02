@@ -73,8 +73,8 @@ class ProjectLogger:
 
     def _redirect_std_streams(self) -> None:
         """Redirects stdout and stderr to the configured logger."""
-        sys.stdout = StreamToLogger(self.logger, logging.INFO)  # type: ignore
-        sys.stderr = StreamToLogger(self.logger, logging.ERROR)  # type: ignore
+        sys.stdout = StreamToLogger(self.logger, logging.INFO)
+        sys.stderr = StreamToLogger(self.logger, logging.ERROR)
 
     def _setup_excepthook(self) -> None:
         """Registers a global exception handler to log fatal errors."""

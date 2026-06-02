@@ -4,8 +4,8 @@ from pathlib import Path
 
 import polars as pl
 import torch
-from sklearn.preprocessing import LabelEncoder, StandardScaler  # type: ignore
-from torch_geometric.data import Data  # type: ignore
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from torch_geometric.data import Data
 
 
 class AMLGraphBuilder:

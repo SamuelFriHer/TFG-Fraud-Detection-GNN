@@ -32,7 +32,7 @@ class GpuAvailabilityChecker:
 
             if importlib.util.find_spec("cuml") is None:
                 raise ImportError("cuml not installed")
-            import cupy  # type: ignore
+            import cupy
 
             # Try to get device count to verify driver sufficiency
             cupy.cuda.runtime.getDeviceCount()
@@ -58,7 +58,7 @@ class GpuAvailabilityChecker:
     def _try_torch_cuda(self) -> bool:
         """Probes CUDA via PyTorch if installed."""
         try:
-            import torch  # type: ignore
+            import torch
 
             available = torch.cuda.is_available()
             if available:

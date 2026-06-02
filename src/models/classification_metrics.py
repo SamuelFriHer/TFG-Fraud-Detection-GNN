@@ -1,7 +1,7 @@
 """Shared classification metric computation for all model implementations."""
 
 import numpy as np
-from sklearn.metrics import (  # type: ignore
+from sklearn.metrics import (
     accuracy_score,
     f1_score,
     precision_score,

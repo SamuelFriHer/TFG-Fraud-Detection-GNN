@@ -2,7 +2,7 @@
 
 import torch
 from torch import nn
-from torch_geometric.data import Data  # type: ignore
+from torch_geometric.data import Data
 
 
 def compute_pos_weight(graph_data: Data) -> float:

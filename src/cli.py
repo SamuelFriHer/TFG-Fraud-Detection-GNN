@@ -15,7 +15,7 @@ from src.utils.logger import ProjectLogger
 load_dotenv()
 
 
-def _build_traditional_parser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore
+def _build_traditional_parser(subparsers: argparse._SubParsersAction) -> None:
     """Registers the 'traditional' subcommand with its arguments."""
     parser = subparsers.add_parser(
         "traditional",
@@ -35,7 +35,7 @@ def _build_traditional_parser(subparsers: argparse._SubParsersAction) -> None:  
     )
 
 
-def _build_gnn_parser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore
+def _build_gnn_parser(subparsers: argparse._SubParsersAction) -> None:
     """Registers the 'gnn' subcommand with its arguments."""
     parser = subparsers.add_parser(
         "gnn",
@@ -49,7 +49,7 @@ def _build_gnn_parser(subparsers: argparse._SubParsersAction) -> None:  # type: 
     )
 
 
-def _build_gnn_grid_parser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore
+def _build_gnn_grid_parser(subparsers: argparse._SubParsersAction) -> None:
     """Registers the 'gnn-grid' subcommand with its arguments."""
     parser = subparsers.add_parser(
         "gnn-grid",
@@ -63,7 +63,7 @@ def _build_gnn_grid_parser(subparsers: argparse._SubParsersAction) -> None:  # t
     )
 
 
-def _build_fetch_results_parser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore
+def _build_fetch_results_parser(subparsers: argparse._SubParsersAction) -> None:
     """Registers the 'fetch-results' subcommand with its arguments."""
     parser = subparsers.add_parser(
         "fetch-results",

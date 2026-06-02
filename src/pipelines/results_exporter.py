@@ -7,7 +7,7 @@ import tarfile
 from pathlib import Path
 
 import mlflow
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from src.utils.data_manager import DataSyncManager
 from src.utils.paths import ARCHIVES_DIR, MLFLOW_DB_PATH, OUTPUTS_DIR, RESULTS_DIR
@@ -106,7 +106,7 @@ class ResultsExporter:
         if experiment is None:
             raise ValueError(f"Experiment '{experiment_name}' not found in the local MLflow store.")
 
-        runs_frame: pd.DataFrame = mlflow.search_runs(  # type: ignore[assignment]
+        runs_frame: pd.DataFrame = mlflow.search_runs(
             experiment_ids=[experiment.experiment_id],
             order_by=["metrics.test_f1 DESC"],
         )

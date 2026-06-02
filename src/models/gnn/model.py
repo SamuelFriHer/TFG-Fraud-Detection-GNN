@@ -4,9 +4,9 @@ import numpy as np
 import torch
 from torch import nn, optim
 from torch.utils.data import WeightedRandomSampler
-from torch_geometric.data import Data  # type: ignore
-from torch_geometric.loader import LinkNeighborLoader  # type: ignore
-from torch_geometric.utils import degree  # type: ignore
+from torch_geometric.data import Data
+from torch_geometric.loader import LinkNeighborLoader
+from torch_geometric.utils import degree
 
 from src.models.gnn.evaluator import evaluate_predictions
 from src.models.gnn.layers import EdgeClassifier, MEGAPNAEncoder
@@ -265,7 +265,7 @@ class GNNFraudDetector:
                 seed_edge_attr = edge_attr[batch.input_id.cpu()].to(self.device)
                 out = self.classifier(z, batch.edge_label_index, seed_edge_attr)
                 preds.append(torch.sigmoid(out).cpu().numpy())
-        return np.concatenate(preds)  # type: ignore[no-any-return]
+        return np.concatenate(preds)
 
     def _get_loader_and_attrs_for_stage(
         self, data: Data, stage: str
@@ -306,13 +306,13 @@ class GNNFraudDetector:
         mask_map = {"train": data.train_mask, "val": data.val_mask, "test": data.test_mask}
         if stage not in mask_map:
             raise ValueError(f"Unknown stage: {stage}")
-        return data.y[mask_map[stage]].cpu().numpy()  # type: ignore[no-any-return]
+        return data.y[mask_map[stage]].cpu().numpy()
 
     def _compute_metrics_at_threshold(
         self, probs: np.ndarray, y_true: np.ndarray
     ) -> dict[str, float]:
         """Computes classification metrics using the stored optimal threshold."""
-        from sklearn.metrics import (  # type: ignore[import-untyped]
+        from sklearn.metrics import (
             accuracy_score,
             average_precision_score,
             f1_score,

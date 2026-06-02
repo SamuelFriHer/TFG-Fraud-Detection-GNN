@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pandas as pd  # type: ignore
+import pandas as pd
 import pytest
 
 from src.pipelines.results_exporter import ResultsExporter

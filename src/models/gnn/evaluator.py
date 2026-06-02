@@ -1,7 +1,7 @@
 """Evaluation utilities for GNN models."""
 
 import numpy as np
-from sklearn.metrics import (  # type: ignore
+from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
     f1_score,

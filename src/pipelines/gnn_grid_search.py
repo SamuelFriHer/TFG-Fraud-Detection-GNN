@@ -58,7 +58,7 @@ class GNNGridSearchPipeline:
         # Generar combinaciones usando itertools.product
         keys = list(grid.keys())
         values = list(grid.values())
-        combinations = list(itertools.product(*values))  # type: ignore[call-overload]
+        combinations = list(itertools.product(*values))
         total_runs = len(combinations)
 
         self.logger.info("Iniciando Grid Search con %d combinaciones", total_runs)
@@ -90,7 +90,7 @@ class GNNGridSearchPipeline:
                 pos_weight=float(full_params["pos_weight"]),
                 dropout=float(full_params["dropout"]),
                 final_dropout=float(full_params.get("final_dropout", full_params["dropout"])),
-                num_neighbors=full_params["num_neighbors"],  # type: ignore[arg-type]
+                num_neighbors=full_params["num_neighbors"],
             )
 
             try:

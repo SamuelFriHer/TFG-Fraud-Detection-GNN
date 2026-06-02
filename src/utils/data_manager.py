@@ -4,9 +4,9 @@ import logging
 import os
 from pathlib import Path
 
-import kagglehub  # type: ignore
+import kagglehub
 from huggingface_hub import HfApi, hf_hub_download
-from huggingface_hub.errors import HfHubHTTPError  # type: ignore
+from huggingface_hub.errors import HfHubHTTPError
 
 from src.utils.paths import PROJECT_ROOT
 

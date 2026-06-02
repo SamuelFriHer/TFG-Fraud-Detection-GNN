@@ -10,7 +10,7 @@ def test_logger_creates_file(tmp_path: Path) -> None:
     log_file = tmp_path / "test_logs.txt"
 
     # Reset singleton array for testing purposes
-    ProjectLogger._ProjectLogger__instance = None  # type: ignore
+    ProjectLogger._ProjectLogger__instance = None
 
     # Initialize logger
     ProjectLogger.initialize(log_file=str(log_file))
@@ -32,4 +32,4 @@ def test_logger_creates_file(tmp_path: Path) -> None:
     # Teardown
     sys.stdout = sys.__stdout__
     sys.stderr = sys.__stderr__
-    ProjectLogger._ProjectLogger__instance = None  # type: ignore
+    ProjectLogger._ProjectLogger__instance = None

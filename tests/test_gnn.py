@@ -5,7 +5,7 @@ import os
 import polars as pl
 import pytest
 import torch
-from torch_geometric.data import Data  # type: ignore
+from torch_geometric.data import Data
 
 from src.data.graph_builder import AMLGraphBuilder
 from src.models.gnn.model import GNNFraudDetector

@@ -62,7 +62,7 @@ class RandomForestModel(IClassificationModel, ClassificationMetricsMixin):
     @staticmethod
     def _build_cuml_classifier(params: dict[str, Any]) -> tuple[Any, str]:
         """Constructs a cuML RandomForestClassifier, filtering unsupported params."""
-        from cuml.ensemble import RandomForestClassifier as CumlRF  # type: ignore
+        from cuml.ensemble import RandomForestClassifier as CumlRF
 
         cuml_params = {k: v for k, v in params.items() if k in _CUML_RF_SUPPORTED_PARAMS}
         return CumlRF(**cuml_params), "cuML (GPU)"
@@ -70,6 +70,6 @@ class RandomForestModel(IClassificationModel, ClassificationMetricsMixin):
     @staticmethod
     def _build_sklearn_classifier(params: dict[str, Any]) -> tuple[Any, str]:
         """Constructs a scikit-learn RandomForestClassifier with all params."""
-        from sklearn.ensemble import RandomForestClassifier  # type: ignore
+        from sklearn.ensemble import RandomForestClassifier
 
         return RandomForestClassifier(**params), "scikit-learn (CPU)"

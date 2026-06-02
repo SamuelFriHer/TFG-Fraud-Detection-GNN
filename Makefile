@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck clean run-traditional run-traditional-large fetch-results
+.PHONY: install test lint clean run-traditional run-traditional-large fetch-results
 
 install:
 	pip install -e ".[dev]"
@@ -9,11 +9,8 @@ test:
 lint:
 	ruff check .
 
-typecheck:
-	mypy src/
-
 clean:
-	rm -rf .pytest_cache .ruff_cache .mypy_cache
+	rm -rf .pytest_cache .ruff_cache
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -f logs.txt
 

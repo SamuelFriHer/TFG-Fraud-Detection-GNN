@@ -62,7 +62,7 @@ class SVMModel(IClassificationModel, ClassificationMetricsMixin):
     @staticmethod
     def _build_cuml_classifier(params: dict[str, Any]) -> tuple[Any, str]:
         """Constructs a cuML SVC, filtering out unsupported params like random_state."""
-        from cuml.svm import SVC  # type: ignore
+        from cuml.svm import SVC
 
         cuml_params = {k: v for k, v in params.items() if k in _CUML_SVC_SUPPORTED_PARAMS}
         return SVC(**cuml_params), "cuML (GPU)"
@@ -70,6 +70,6 @@ class SVMModel(IClassificationModel, ClassificationMetricsMixin):
     @staticmethod
     def _build_sklearn_classifier(params: dict[str, Any]) -> tuple[Any, str]:
         """Constructs a scikit-learn SVC with all params."""
-        from sklearn.svm import SVC  # type: ignore
+        from sklearn.svm import SVC
 
         return SVC(**params), "scikit-learn (CPU)"
