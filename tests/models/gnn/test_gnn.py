@@ -9,6 +9,7 @@ from torch_geometric.data import Data
 
 from src.data.graph_builder import AMLGraphBuilder
 from src.models.gnn.model import GNNFraudDetector
+from src.models.interfaces import IGraphModel
 
 
 @pytest.fixture
@@ -64,6 +65,11 @@ def test_graph_builder(mock_graph_data: tuple[pl.DataFrame, pl.DataFrame], tmp_p
     assert hasattr(data, "train_mask")
     assert hasattr(data, "val_mask")
     assert hasattr(data, "test_mask")
+
+
+def test_gnn_interface() -> None:
+    """Interface: Verify GNN model implements the correct interface."""
+    assert issubclass(GNNFraudDetector, IGraphModel)
 
 
 def test_gnn_forward_pass() -> None:

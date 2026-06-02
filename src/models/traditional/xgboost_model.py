@@ -6,12 +6,12 @@ from typing import Any
 import numpy as np
 from xgboost import XGBClassifier
 
-from src.models.base import IClassificationModel
 from src.models.classification_metrics import ClassificationMetricsMixin
+from src.models.interfaces import ITraditionalModel
 from src.utils.gpu_availability import GpuAvailabilityChecker
 
 
-class XGBoostModel(IClassificationModel, ClassificationMetricsMixin):
+class XGBoostModel(ITraditionalModel, ClassificationMetricsMixin):
     """XGBoost gradient boosting classifier with automatic CUDA acceleration."""
 
     def __init__(self, **kwargs: Any) -> None:

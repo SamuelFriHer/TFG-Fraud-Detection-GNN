@@ -18,12 +18,13 @@ from src.models.gnn.evaluator import (
 from src.models.gnn.layers import EdgeClassifier, MEGAPNAEncoder
 from src.models.gnn.loss import prepare_loss_criterion
 from src.models.gnn.utils import predict_gnn, train_gnn_epoch
+from src.models.interfaces import IGraphModel
 from src.utils.logger import ProjectLogger
 
 SCHEDULER_MIN_LR = 1e-6
 
 
-class GNNFraudDetector:
+class GNNFraudDetector(IGraphModel):
     """GNN model for edge-level transaction classification using MEGA-PNA."""
 
     def __init__(

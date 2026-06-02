@@ -5,8 +5,8 @@ from typing import Any
 
 import numpy as np
 
-from src.models.base import IClassificationModel
 from src.models.classification_metrics import ClassificationMetricsMixin
+from src.models.interfaces import ITraditionalModel
 from src.utils.gpu_availability import GpuAvailabilityChecker
 
 _CUML_SVC_SUPPORTED_PARAMS: set[str] = {
@@ -23,7 +23,7 @@ _CUML_SVC_SUPPORTED_PARAMS: set[str] = {
 }
 
 
-class SVMModel(IClassificationModel, ClassificationMetricsMixin):
+class SVMModel(ITraditionalModel, ClassificationMetricsMixin):
     """SVM classifier using cuML (GPU) when available, sklearn (CPU) otherwise."""
 
     def __init__(self, **kwargs: Any) -> None:

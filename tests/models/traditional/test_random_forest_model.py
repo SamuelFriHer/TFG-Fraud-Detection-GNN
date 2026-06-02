@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.models.base import IClassificationModel
+from src.models.interfaces import ITraditionalModel
 from src.models.traditional.random_forest_model import RandomForestModel
 
 
@@ -15,7 +15,7 @@ def model() -> RandomForestModel:
 
 def test_interface(model: RandomForestModel) -> None:
     """Interface: Verify model implements the correct interface."""
-    assert isinstance(model, IClassificationModel)
+    assert isinstance(model, ITraditionalModel)
     assert hasattr(model, "train")
     assert hasattr(model, "predict")
     assert hasattr(model, "evaluate")

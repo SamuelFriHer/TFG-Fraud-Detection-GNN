@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.models.base import IClassificationModel
+from src.models.interfaces import ITraditionalModel
 from src.models.traditional.xgboost_model import XGBoostModel
 
 
@@ -15,7 +15,7 @@ def model() -> XGBoostModel:
 
 def test_interface(model: XGBoostModel) -> None:
     """Interface: Verify model implements the correct interface."""
-    assert isinstance(model, IClassificationModel)
+    assert isinstance(model, ITraditionalModel)
     assert hasattr(model, "train")
     assert hasattr(model, "predict")
     assert hasattr(model, "evaluate")

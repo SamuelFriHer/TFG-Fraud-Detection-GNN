@@ -7,12 +7,12 @@ from typing import Any
 import numpy as np
 from lightgbm import LGBMClassifier
 
-from src.models.base import IClassificationModel
 from src.models.classification_metrics import ClassificationMetricsMixin
+from src.models.interfaces import ITraditionalModel
 from src.utils.gpu_availability import GpuAvailabilityChecker
 
 
-class LightGBMModel(IClassificationModel, ClassificationMetricsMixin):
+class LightGBMModel(ITraditionalModel, ClassificationMetricsMixin):
     """LightGBM gradient boosting classifier with automatic GPU acceleration."""
 
     def __init__(self, **kwargs: Any) -> None:
