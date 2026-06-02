@@ -6,9 +6,9 @@ import time
 import numpy as np
 import polars as pl
 
+from src.config.experiment_config import ExperimentConfig
 from src.data.preprocessor import DataPreprocessor
 from src.models.traditional import create_model
-from src.pipelines.experiment_config import ExperimentConfig
 from src.tracking.experiment_tracker import ExperimentTracker
 from src.utils.data_manager import DataSyncManager
 

@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from src.pipelines.experiment_config import DatasetConfig, ExperimentConfig, SplitConfig
+from src.config.experiment_config import DatasetConfig, ExperimentConfig, SplitConfig
 from src.pipelines.traditional_pipeline import TraditionalPipeline
 
 
@@ -26,7 +26,7 @@ def pipeline(mock_config: ExperimentConfig) -> TraditionalPipeline:
     """Provides a TraditionalPipeline instance with mocked dependencies."""
     with (
         patch(
-            "src.pipelines.experiment_config.ExperimentConfig.from_toml",
+            "src.config.experiment_config.ExperimentConfig.from_toml",
             return_value=mock_config,
         ),
         patch("src.pipelines.traditional_pipeline.DataSyncManager"),
