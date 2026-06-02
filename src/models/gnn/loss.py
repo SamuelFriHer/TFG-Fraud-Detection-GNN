@@ -17,3 +17,11 @@ def build_weighted_bce_loss(pos_weight_value: float, device: torch.device) -> nn
     """Builds a BCEWithLogitsLoss with the specified positive class weight."""
     pos_weight_tensor = torch.tensor([pos_weight_value], device=device)
     return nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
+
+
+def prepare_loss_criterion(
+    pos_weight: float | None, graph_data: Data, device: torch.device
+) -> nn.Module:
+    """Builds Weighted BCE loss, computing pos_weight from data if not provided."""
+    weight_value = pos_weight or compute_pos_weight(graph_data)
+    return build_weighted_bce_loss(weight_value, device)

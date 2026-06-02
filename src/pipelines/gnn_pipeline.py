@@ -42,7 +42,7 @@ class GNNPipeline:
 
         self.logger.info("Instanciando GNNFraudDetector (MEGA-PNA)")
         model = GNNFraudDetector(
-            data=data,
+            graph_data=data,
             node_feat_dim=node_dim,
             edge_feat_dim=edge_dim,
             hidden_channels=gnn_config.get("hidden_channels", 64),

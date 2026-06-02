@@ -91,7 +91,7 @@ def test_gnn_forward_pass() -> None:
     )
 
     model = GNNFraudDetector(
-        data=data,
+        graph_data=data,
         node_feat_dim=node_feat_dim,
         edge_feat_dim=edge_feat_dim,
         hidden_channels=8,
@@ -149,7 +149,7 @@ def test_gnn_weighted_sampler() -> None:
     )
 
     model = GNNFraudDetector(
-        data=data,
+        graph_data=data,
         node_feat_dim=node_feat_dim,
         edge_feat_dim=edge_feat_dim,
         hidden_channels=8,
@@ -158,5 +158,7 @@ def test_gnn_weighted_sampler() -> None:
         epochs=1,
     )
 
-    loader = model._get_train_loader(data)
+    from src.models.gnn.data_loader import get_train_loader
+
+    loader = get_train_loader(data, model.num_neighbors, model.batch_size)
     assert loader.sampler is not None

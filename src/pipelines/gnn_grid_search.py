@@ -79,7 +79,7 @@ class GNNGridSearchPipeline:
             tracker.log_params(full_params)
 
             model = GNNFraudDetector(
-                data=data,
+                graph_data=data,
                 node_feat_dim=node_dim,
                 edge_feat_dim=edge_dim,
                 hidden_channels=int(full_params["hidden_channels"]),
