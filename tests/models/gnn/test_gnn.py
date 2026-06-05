@@ -8,6 +8,7 @@ import torch
 from torch_geometric.data import Data
 
 from src.data.graph_builder import AMLGraphBuilder
+from src.models.gnn.config import GNNModelConfig
 from src.models.gnn.model import GNNFraudDetector
 from src.models.interfaces import IGraphModel
 
@@ -96,14 +97,17 @@ def test_gnn_forward_pass() -> None:
         test_mask=test_mask,
     )
 
-    model = GNNFraudDetector(
-        graph_data=data,
+    config = GNNModelConfig(
         node_feat_dim=node_feat_dim,
         edge_feat_dim=edge_feat_dim,
         hidden_channels=8,
         num_layers=2,
         batch_size=2,
         epochs=1,
+    )
+    model = GNNFraudDetector(
+        graph_data=data,
+        config=config,
     )
 
     model.device = torch.device("cpu")
@@ -154,8 +158,7 @@ def test_gnn_weighted_sampler() -> None:
         test_mask=test_mask,
     )
 
-    model = GNNFraudDetector(
-        graph_data=data,
+    config = GNNModelConfig(
         node_feat_dim=node_feat_dim,
         edge_feat_dim=edge_feat_dim,
         hidden_channels=8,
@@ -163,8 +166,12 @@ def test_gnn_weighted_sampler() -> None:
         batch_size=2,
         epochs=1,
     )
+    model = GNNFraudDetector(
+        graph_data=data,
+        config=config,
+    )
 
     from src.models.gnn.data_loader import get_train_loader
 
-    loader = get_train_loader(data, model.num_neighbors, model.batch_size)
+    loader = get_train_loader(data, model.config.num_neighbors, model.config.batch_size)
     assert loader.sampler is not None

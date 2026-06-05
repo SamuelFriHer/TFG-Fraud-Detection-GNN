@@ -5,6 +5,7 @@ import torch
 from torch import optim
 from torch_geometric.data import Data
 
+from src.models.gnn.config import GNNModelConfig
 from src.models.gnn.data_loader import (
     compute_degree_histogram,
     get_loader_and_attrs_for_stage,
@@ -30,62 +31,28 @@ class GNNFraudDetector(IGraphModel):
     def __init__(
         self,
         graph_data: Data,
-        node_feat_dim: int,
-        edge_feat_dim: int,
-        hidden_channels: int = 64,
-        num_layers: int = 2,
-        lr: float = 0.001,
-        batch_size: int = 2048,
-        epochs: int = 80,
-        pos_weight: float | None = None,
-        dropout: float = 0.1,
-        final_dropout: float = 0.1,
-        num_neighbors: list[int] | None = None,
+        config: GNNModelConfig,
     ) -> None:
         """Initializes MEGA-PNA encoder, edge classifier and training config."""
         deg = compute_degree_histogram(graph_data)
-        self.lr = lr
-        self.batch_size = batch_size
-        self.epochs = epochs
-        self.pos_weight = pos_weight
+        self.config = config
         self.threshold = 0.5
-        self.num_neighbors = num_neighbors or [20, 10]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._init_network(
-            node_feat_dim,
-            edge_feat_dim,
-            hidden_channels,
-            num_layers,
-            deg,
-            dropout,
-            final_dropout,
-        )
+        self._init_network(config, deg)
         self.logger = ProjectLogger.get_logger("GNNFraudDetector")
 
     def _init_network(
         self,
-        node_feat_dim: int,
-        edge_feat_dim: int,
-        hidden_channels: int,
-        num_layers: int,
+        config: GNNModelConfig,
         deg: torch.Tensor,
-        dropout: float,
-        final_dropout: float,
     ) -> None:
         """Initializes encoder and classifier modules and transfers to device."""
-        self.encoder = MEGAPNAEncoder(
-            node_feat_dim + 1,
-            edge_feat_dim,
-            hidden_channels,
-            num_layers,
-            deg=deg,
-            dropout=dropout,
-        )
+        self.encoder = MEGAPNAEncoder(config, deg)
         self.classifier = EdgeClassifier(
-            hidden_channels,
-            edge_feat_dim,
-            hidden_channels,
-            final_dropout=final_dropout,
+            config.hidden_channels,
+            config.edge_feat_dim,
+            config.hidden_channels,
+            final_dropout=config.final_dropout,
         )
         self.encoder.to(self.device)
         self.classifier.to(self.device)
@@ -109,15 +76,24 @@ class GNNFraudDetector(IGraphModel):
     def train(self, graph_data: Data) -> None:
         """Trains the GNN with LR scheduling and checkpoints the best model."""
         all_params = list(self.encoder.parameters()) + list(self.classifier.parameters())
-        optimizer = optim.Adam(all_params, lr=self.lr)
+        optimizer = optim.Adam(all_params, lr=self.config.lr)
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=self.epochs, eta_min=SCHEDULER_MIN_LR
+            optimizer, T_max=self.config.epochs, eta_min=SCHEDULER_MIN_LR
         )
-        criterion = prepare_loss_criterion(self.pos_weight, graph_data, self.device)
-        loader = get_train_loader(graph_data, self.num_neighbors, self.batch_size)
+        criterion = prepare_loss_criterion(self.config.pos_weight, graph_data, self.device)
+        context = self._create_training_context(graph_data, optimizer, criterion)
+        self._run_training_loop(context, optimizer, scheduler, graph_data)
+
+    def _create_training_context(
+        self,
+        graph_data: Data,
+        optimizer: optim.Optimizer,
+        criterion: torch.nn.Module,
+    ) -> GNNTrainingContext:
+        """Creates the training context for the training epochs."""
+        loader = get_train_loader(graph_data, self.config.num_neighbors, self.config.batch_size)
         train_edge_attr = graph_data.edge_attr[graph_data.train_mask]
-        best_pr_auc, best_enc_state, best_cls_state = -1.0, None, None
-        context = GNNTrainingContext(
+        return GNNTrainingContext(
             self.encoder,
             self.classifier,
             loader,
@@ -127,13 +103,22 @@ class GNNFraudDetector(IGraphModel):
             self.device,
         )
 
-        for epoch in range(self.epochs):
+    def _run_training_loop(
+        self,
+        context: GNNTrainingContext,
+        optimizer: optim.Optimizer,
+        scheduler: optim.lr_scheduler.CosineAnnealingLR,
+        graph_data: Data,
+    ) -> None:
+        """Runs the epoch training loop, scheduling learning rate and saving weights."""
+        best_pr_auc, best_enc_state, best_cls_state = -1.0, None, None
+        for epoch in range(self.config.epochs):
             avg_loss = train_gnn_epoch(context)
             scheduler.step()
             self.logger.info(
                 "Epoch %d/%d - Loss: %.4f - LR: %.6f",
                 epoch + 1,
-                self.epochs,
+                self.config.epochs,
                 avg_loss,
                 optimizer.param_groups[0]["lr"],
             )
@@ -141,7 +126,6 @@ class GNNFraudDetector(IGraphModel):
             best_pr_auc, best_enc_state, best_cls_state = self._checkpoint_best(
                 epoch, metrics["pr_auc"], best_pr_auc, best_enc_state, best_cls_state
             )
-
         self._restore_best_weights(best_enc_state, best_cls_state, best_pr_auc)
 
     def _restore_best_weights(
@@ -159,7 +143,7 @@ class GNNFraudDetector(IGraphModel):
     def predict(self, graph_data: Data, stage: str = "val") -> np.ndarray:
         """Generates sigmoid probabilities for edges at the given stage."""
         loader, edge_attr = get_loader_and_attrs_for_stage(
-            graph_data, stage, self.num_neighbors, self.batch_size
+            graph_data, stage, self.config.num_neighbors, self.config.batch_size
         )
         return predict_gnn(self.encoder, self.classifier, loader, edge_attr, self.device)
 

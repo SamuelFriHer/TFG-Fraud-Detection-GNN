@@ -3,6 +3,7 @@
 import tomllib
 
 from src.data.graph_builder import AMLGraphBuilder
+from src.models.gnn.config import GNNModelConfig
 from src.models.gnn.model import GNNFraudDetector
 from src.tracking.experiment_tracker import ExperimentTracker
 from src.utils.data_manager import DataSyncManager
@@ -41,8 +42,7 @@ class GNNPipeline:
         gnn_config = self.config["models"]["GraphSAGE"]
 
         self.logger.info("Instanciando GNNFraudDetector (MEGA-PNA)")
-        model = GNNFraudDetector(
-            graph_data=data,
+        model_config = GNNModelConfig(
             node_feat_dim=node_dim,
             edge_feat_dim=edge_dim,
             hidden_channels=gnn_config.get("hidden_channels", 64),
@@ -54,6 +54,10 @@ class GNNPipeline:
             dropout=gnn_config.get("dropout", 0.1),
             final_dropout=gnn_config.get("final_dropout", 0.1),
             num_neighbors=gnn_config.get("num_neighbors", [20, 10]),
+        )
+        model = GNNFraudDetector(
+            graph_data=data,
+            config=model_config,
         )
 
         tracker.start_run(run_name="MEGA_PNA")

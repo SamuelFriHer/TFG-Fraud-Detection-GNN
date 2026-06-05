@@ -7,6 +7,7 @@ import tomllib
 import torch
 
 from src.data.graph_builder import AMLGraphBuilder
+from src.models.gnn.config import GNNModelConfig
 from src.models.gnn.model import GNNFraudDetector
 from src.tracking.experiment_tracker import ExperimentTracker
 from src.utils.data_manager import DataSyncManager
@@ -78,8 +79,7 @@ class GNNGridSearchPipeline:
             full_params.update(params)
             tracker.log_params(full_params)
 
-            model = GNNFraudDetector(
-                graph_data=data,
+            model_config = GNNModelConfig(
                 node_feat_dim=node_dim,
                 edge_feat_dim=edge_dim,
                 hidden_channels=int(full_params["hidden_channels"]),
@@ -91,6 +91,10 @@ class GNNGridSearchPipeline:
                 dropout=float(full_params["dropout"]),
                 final_dropout=float(full_params.get("final_dropout", full_params["dropout"])),
                 num_neighbors=full_params["num_neighbors"],
+            )
+            model = GNNFraudDetector(
+                graph_data=data,
+                config=model_config,
             )
 
             try:

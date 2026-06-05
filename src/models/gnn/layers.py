@@ -8,6 +8,8 @@ from torch import nn
 from torch_geometric.nn import PNAConv
 from torch_scatter import scatter
 
+from src.models.gnn.config import GNNModelConfig
+
 
 class MEGAPNAEncoder(nn.Module):
     """Codificador de nodos basado en MEGA-PNA.
@@ -18,58 +20,44 @@ class MEGAPNAEncoder(nn.Module):
 
     def __init__(
         self,
-        in_channels: int,
-        edge_dim: int,
-        hidden_channels: int,
-        num_layers: int,
+        config: GNNModelConfig,
         deg: torch.Tensor,
-        dropout: float = 0.1,
     ) -> None:
         """Inicializa las capas MEGA-PNA."""
         super().__init__()
-        self.num_layers = num_layers
-        self.dropout = dropout
-
-        # Después de flatten_edges: edge_dim * 4 (mean, max, min, std)
-        # Después de reverse_mp: + 1 (flag de dirección)
-        self.processed_edge_dim = (edge_dim * 4) + 1
-
+        self.num_layers = config.num_layers
+        self.dropout = config.dropout
+        self.processed_edge_dim = (config.edge_feat_dim * 4) + 1
+        self.node_proj = nn.Linear(config.in_channels, config.hidden_channels)
         self.convs = nn.ModuleList()
         self.edge_mlps = nn.ModuleList()
+        self._build_layers(config, deg)
 
-        aggregators = ["mean", "min", "max", "std"]
-        scalers = ["identity", "amplification", "attenuation"]
-
-        # Node projection para ajustar in_channels a hidden_channels si difieren
-        self.node_proj = nn.Linear(in_channels, hidden_channels)
-
-        current_in_channels = hidden_channels
+    def _build_layers(self, config: GNNModelConfig, deg: torch.Tensor) -> None:
+        """Construye las capas convolucionales y MLPs de aristas."""
+        current_in_channels = config.hidden_channels
         current_edge_dim = self.processed_edge_dim
-
-        for i in range(num_layers):
+        for _ in range(config.num_layers):
             self.convs.append(
                 PNAConv(
                     in_channels=current_in_channels,
-                    out_channels=hidden_channels,
-                    aggregators=aggregators,
-                    scalers=scalers,
+                    out_channels=config.hidden_channels,
+                    aggregators=["mean", "min", "max", "std"],
+                    scalers=["identity", "amplification", "attenuation"],
                     deg=deg,
                     edge_dim=current_edge_dim,
                 )
             )
-
-            # MLP para actualizar atributos de arista (emlps)
-            # Entrada: arista_actual + src_node + dst_node
-            mlp_in_dim = current_edge_dim + (hidden_channels * 2)
+            mlp_in_dim = current_edge_dim + (config.hidden_channels * 2)
             self.edge_mlps.append(
                 nn.Sequential(
-                    nn.Linear(mlp_in_dim, hidden_channels),
+                    nn.Linear(mlp_in_dim, config.hidden_channels),
                     nn.ReLU(),
-                    nn.Linear(hidden_channels, hidden_channels),
+                    nn.Linear(config.hidden_channels, config.hidden_channels),
                 )
             )
-            current_in_channels = hidden_channels
-            current_edge_dim = hidden_channels
+            current_in_channels = config.hidden_channels
+            current_edge_dim = config.hidden_channels
 
     def _flatten_edges(
         self, edge_index: torch.Tensor, edge_attr: torch.Tensor, num_nodes: int
