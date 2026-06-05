@@ -17,7 +17,7 @@ from src.models.gnn.evaluator import (
 )
 from src.models.gnn.layers import EdgeClassifier, MEGAPNAEncoder
 from src.models.gnn.loss import prepare_loss_criterion
-from src.models.gnn.utils import predict_gnn, train_gnn_epoch
+from src.models.gnn.utils import GNNTrainingContext, predict_gnn, train_gnn_epoch
 from src.models.interfaces import IGraphModel
 from src.utils.logger import ProjectLogger
 
@@ -90,6 +90,22 @@ class GNNFraudDetector(IGraphModel):
         self.encoder.to(self.device)
         self.classifier.to(self.device)
 
+    def _checkpoint_best(
+        self,
+        epoch: int,
+        pr_auc: float,
+        best_pr_auc: float,
+        best_enc_state: dict[str, torch.Tensor] | None,
+        best_cls_state: dict[str, torch.Tensor] | None,
+    ) -> tuple[float, dict[str, torch.Tensor] | None, dict[str, torch.Tensor] | None]:
+        """Checkpoints GNN model weights if the validation PR-AUC improves."""
+        if pr_auc > best_pr_auc:
+            best_enc_state = {k: v.cpu().clone() for k, v in self.encoder.state_dict().items()}
+            best_cls_state = {k: v.cpu().clone() for k, v in self.classifier.state_dict().items()}
+            self.logger.info("Best model updated at epoch %d (Val PR-AUC: %.4f)", epoch + 1, pr_auc)
+            return pr_auc, best_enc_state, best_cls_state
+        return best_pr_auc, best_enc_state, best_cls_state
+
     def train(self, graph_data: Data) -> None:
         """Trains the GNN with LR scheduling and checkpoints the best model."""
         all_params = list(self.encoder.parameters()) + list(self.classifier.parameters())
@@ -101,17 +117,18 @@ class GNNFraudDetector(IGraphModel):
         loader = get_train_loader(graph_data, self.num_neighbors, self.batch_size)
         train_edge_attr = graph_data.edge_attr[graph_data.train_mask]
         best_pr_auc, best_enc_state, best_cls_state = -1.0, None, None
+        context = GNNTrainingContext(
+            self.encoder,
+            self.classifier,
+            loader,
+            optimizer,
+            criterion,
+            train_edge_attr,
+            self.device,
+        )
 
         for epoch in range(self.epochs):
-            avg_loss = train_gnn_epoch(
-                self.encoder,
-                self.classifier,
-                loader,
-                optimizer,
-                criterion,
-                train_edge_attr,
-                self.device,
-            )
+            avg_loss = train_gnn_epoch(context)
             scheduler.step()
             self.logger.info(
                 "Epoch %d/%d - Loss: %.4f - LR: %.6f",
@@ -120,18 +137,10 @@ class GNNFraudDetector(IGraphModel):
                 avg_loss,
                 optimizer.param_groups[0]["lr"],
             )
-
             metrics = self.evaluate(graph_data, stage="val")
-            pr_auc = metrics["pr_auc"]
-            if pr_auc > best_pr_auc:
-                best_pr_auc = pr_auc
-                best_enc_state = {k: v.cpu().clone() for k, v in self.encoder.state_dict().items()}
-                best_cls_state = {
-                    k: v.cpu().clone() for k, v in self.classifier.state_dict().items()
-                }
-                self.logger.info(
-                    "Best model updated at epoch %d (Val PR-AUC: %.4f)", epoch + 1, pr_auc
-                )
+            best_pr_auc, best_enc_state, best_cls_state = self._checkpoint_best(
+                epoch, metrics["pr_auc"], best_pr_auc, best_enc_state, best_cls_state
+            )
 
         self._restore_best_weights(best_enc_state, best_cls_state, best_pr_auc)
 
