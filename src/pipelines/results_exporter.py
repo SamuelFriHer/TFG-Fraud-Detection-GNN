@@ -84,18 +84,43 @@ class ResultsExporter:
                 raise tarfile.ReadError(f"Not a valid tar file: {archive_path}")
 
             with tarfile.open(archive_path, "r:gz") as tar:
-                tar.extractall(path=OUTPUTS_DIR)
-        except (EOFError, tarfile.ReadError, gzip.BadGzipFile) as extraction_error:
+                self._safe_extractall(tar, OUTPUTS_DIR)
+        except (
+            EOFError,
+            tarfile.ReadError,
+            gzip.BadGzipFile,
+            tarfile.ExtractError,
+        ) as extraction_error:
             self.logger.error(
-                "Corrupted archive detected at '%s': %s", archive_path, extraction_error
+                "Corrupted or unsafe archive detected at '%s': %s", archive_path, extraction_error
             )
             if archive_path.exists():
-                self.logger.info("Deleting corrupted archive to allow redownload on next run.")
+                self.logger.info("Deleting corrupted or unsafe archive to allow redownload.")
                 archive_path.unlink()
             raise RuntimeError(
                 f"Archive extraction failed for {archive_path.name}. "
-                "The file was corrupted and has been deleted. Please retry the operation."
+                "The file was corrupted or unsafe and has been deleted. Please retry the operation."
             ) from extraction_error
+
+    def _safe_extractall(self, tar: tarfile.TarFile, path: Path) -> None:
+        """Extracts a tar archive safely, avoiding path traversal (CWE-22) vulnerabilities."""
+        if hasattr(tarfile, "data_filter"):
+            tar.extractall(path=path, filter="data")
+            return
+
+        for member in tar.getmembers():
+            member_path = path / member.name
+            if not self._is_safe_path(path, member_path):
+                raise tarfile.ExtractError(f"Attempted path traversal in tar file: {member.name}")
+        tar.extractall(path=path)
+
+    def _is_safe_path(self, base_dir: Path, target_path: Path) -> bool:
+        """Checks if the target path resolves within the base directory."""
+        try:
+            target_path.resolve().relative_to(base_dir.resolve())
+            return True
+        except ValueError:
+            return False
 
     def _query_experiment(self, experiment_name: str) -> pd.DataFrame:
         """Queries the local MLflow SQLite store and returns all runs as a DataFrame."""

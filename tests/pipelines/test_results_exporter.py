@@ -135,3 +135,72 @@ class TestResultsExporter:
             # "bad" has NaN in a metric column, should be dropped by dropna(subset=metric_cols)
             assert len(result_df) == 1
             assert result_df.iloc[0]["Model"] == "good"
+
+    def test_is_safe_path(self, exporter: ResultsExporter) -> None:
+        """Tests that _is_safe_path correctly identifies safe vs unsafe paths."""
+        base_dir = Path("/tmp/base")
+        assert exporter._is_safe_path(base_dir, base_dir / "safe_file.txt")
+        assert exporter._is_safe_path(base_dir, base_dir / "subdir" / "safe_file.txt")
+        assert not exporter._is_safe_path(base_dir, base_dir / ".." / "unsafe.txt")
+        assert not exporter._is_safe_path(base_dir, Path("/etc/passwd"))
+
+    def test_safe_extractall_with_filter(self, exporter: ResultsExporter) -> None:
+        """Tests that _safe_extractall uses filter='data' when supported."""
+        import tarfile
+
+        mock_tar = MagicMock(spec=tarfile.TarFile)
+        with patch("tarfile.data_filter", create=True):
+            exporter._safe_extractall(mock_tar, Path("/tmp/base"))
+            mock_tar.extractall.assert_called_once_with(path=Path("/tmp/base"), filter="data")
+
+    def test_safe_extractall_fallback_happy_path(self, exporter: ResultsExporter) -> None:
+        """Tests manual validation fallback when PEP 706 filter is not available."""
+        import tarfile
+
+        mock_tar = MagicMock(spec=tarfile.TarFile)
+        mock_member = MagicMock(spec=tarfile.TarInfo)
+        mock_member.name = "safe_file.txt"
+        mock_tar.getmembers.return_value = [mock_member]
+
+        with patch("src.pipelines.results_exporter.hasattr", return_value=False):
+            exporter._safe_extractall(mock_tar, Path("/tmp/base"))
+            mock_tar.extractall.assert_called_once_with(path=Path("/tmp/base"))
+
+    def test_safe_extractall_fallback_traversal(self, exporter: ResultsExporter) -> None:
+        """Tests that manual validation fallback raises ExtractError on traversal."""
+        import tarfile
+
+        mock_tar = MagicMock(spec=tarfile.TarFile)
+        mock_member = MagicMock(spec=tarfile.TarInfo)
+        mock_member.name = "../unsafe.txt"
+        mock_tar.getmembers.return_value = [mock_member]
+
+        with (
+            patch("src.pipelines.results_exporter.hasattr", return_value=False),
+            pytest.raises(tarfile.ExtractError, match="Attempted path traversal"),
+        ):
+            exporter._safe_extractall(mock_tar, Path("/tmp/base"))
+
+    def test_extract_archive_unsafe_deletes_file(self, exporter: ResultsExporter) -> None:
+        """Tests that _extract_archive deletes the archive and raises RuntimeError on unsafe tar."""
+        import tarfile
+
+        mock_archive = MagicMock(spec=Path)
+        mock_archive.name = "unsafe.tar.gz"
+        mock_archive.exists.return_value = True
+
+        with (
+            patch("tarfile.is_tarfile", return_value=True),
+            patch("tarfile.open") as mock_open,
+        ):
+            mock_tar = MagicMock()
+            mock_open.return_value.__enter__.return_value = mock_tar
+            with (
+                patch.object(
+                    exporter, "_safe_extractall", side_effect=tarfile.ExtractError("traversal")
+                ),
+                pytest.raises(RuntimeError, match="Archive extraction failed"),
+            ):
+                exporter._extract_archive(mock_archive)
+
+            mock_archive.unlink.assert_called_once()
