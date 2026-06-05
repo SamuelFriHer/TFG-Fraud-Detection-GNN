@@ -63,4 +63,3 @@ class EdgeFeatureExtractor:
         std: torch.Tensor = feature_tensor.std(dim=0, correction=0, keepdim=True)
         std = torch.where(std == 0, torch.ones_like(std), std)
         return (feature_tensor - mean) / std
-

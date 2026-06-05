@@ -57,7 +57,9 @@ class AMLGraphBuilder:
 
     def _prepare_accounts(self, accounts_df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]]:
         """Prepares accounts DataFrame and returns unique account list."""
-        acc_id: pl.Series = accounts_df["Bank ID"].cast(pl.String) + "_" + accounts_df["Account Number"]
+        acc_id: pl.Series = (
+            accounts_df["Bank ID"].cast(pl.String) + "_" + accounts_df["Account Number"]
+        )
         accounts_df = accounts_df.with_columns(acc_id.alias("Account_ID"))
         unique_accounts: list[str] = acc_id.unique().to_list()
         self.account_id_map = {acc: idx for idx, acc in enumerate(unique_accounts)}
@@ -72,9 +74,9 @@ class AMLGraphBuilder:
         trans_df = trans_df.with_columns(
             [src_accounts.alias("From_Acc"), dst_accounts.alias("To_Acc")]
         )
-        valid_mask: pl.Series = trans_df["From_Acc"].is_in(unique_accounts) & trans_df["To_Acc"].is_in(
-            unique_accounts
-        )
+        valid_mask: pl.Series = trans_df["From_Acc"].is_in(unique_accounts) & trans_df[
+            "To_Acc"
+        ].is_in(unique_accounts)
         return (
             trans_df.filter(valid_mask)
             .with_columns(
