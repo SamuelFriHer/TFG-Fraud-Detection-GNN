@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
 
 class DataPreprocessor:
@@ -13,7 +12,7 @@ class DataPreprocessor:
 
     def __init__(self) -> None:
         """Initializes the DataPreprocessor with an empty encoder registry."""
-        self.encoders: dict[str, LabelEncoder] = {}
+        self.encoders: dict[str, list[str]] = {}
 
     def _find_csv_file(self, directory: str, dataset_prefix: str) -> str:
         """Locates a CSV file in a directory using the given dataset prefix."""
@@ -46,15 +45,14 @@ class DataPreprocessor:
         return df.drop_nulls()
 
     def encode_features(self, df: pl.DataFrame, categorical_cols: list[str]) -> pl.DataFrame:
-        """Label-encodes string categorical columns, saving encoders for inverse transforms."""
+        """Label-encodes string categorical columns, saving categories for consistency."""
         encoded_dict: dict[str, pl.Series] = {}
         for col in df.columns:
             if col in categorical_cols:
                 if col not in self.encoders:
-                    self.encoders[col] = LabelEncoder()
-                pandas_series = df[col].to_pandas()
-                encoded_vals = self.encoders[col].fit_transform(pandas_series)
-                encoded_dict[col] = pl.Series(col, encoded_vals)
+                    self.encoders[col] = df[col].unique().drop_nulls().sort().to_list()
+                categories: list[str] = self.encoders[col]
+                encoded_dict[col] = df[col].cast(pl.Enum(categories)).to_physical().cast(pl.Int64)
             else:
                 encoded_dict[col] = df[col]
         return pl.DataFrame(encoded_dict)

@@ -2,7 +2,6 @@
 
 import polars as pl
 import torch
-from sklearn.preprocessing import LabelEncoder
 
 
 class EdgeFeatureExtractor:
@@ -10,7 +9,7 @@ class EdgeFeatureExtractor:
 
     def __init__(self) -> None:
         """Initializes the edge feature extractor."""
-        self.edge_encoders: dict[str, LabelEncoder] = {}
+        self.edge_encoders: dict[str, list[str]] = {}
 
     def extract_features(self, trans_df: pl.DataFrame) -> torch.Tensor:
         """Extracts, encodes, and scales edge features from transactions."""
@@ -44,12 +43,11 @@ class EdgeFeatureExtractor:
         return torch.tensor(encoded_df.to_numpy(), dtype=torch.float)
 
     def _encode_categorical_col(self, df: pl.DataFrame, col: str) -> pl.Series:
-        """Encodes a categorical column using a LabelEncoder."""
+        """Encodes a categorical column using Polars' native categorical casting."""
         if col not in self.edge_encoders:
-            self.edge_encoders[col] = LabelEncoder()
-        pandas_series = df[col].to_pandas()
-        encoded_vals = self.edge_encoders[col].fit_transform(pandas_series)
-        return pl.Series(col, encoded_vals)
+            self.edge_encoders[col] = df[col].unique().drop_nulls().sort().to_list()
+        categories: list[str] = self.edge_encoders[col]
+        return df[col].cast(pl.Enum(categories)).to_physical().cast(pl.Int64)
 
     def _handle_numerical_col(self, df: pl.DataFrame, col: str) -> pl.Series:
         """Handles numeric or timestamp columns."""

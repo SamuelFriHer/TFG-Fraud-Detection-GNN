@@ -4,7 +4,6 @@ from pathlib import Path
 
 import polars as pl
 import torch
-from sklearn.preprocessing import LabelEncoder
 from torch_geometric.data import Data
 
 from src.data.edge_feature_extractor import EdgeFeatureExtractor
@@ -18,11 +17,11 @@ class AMLGraphBuilder:
         """Initializes the graph builder with the necessary mappings."""
         self.node_extractor = NodeFeatureExtractor()
         self.edge_extractor = EdgeFeatureExtractor()
-        self.node_encoders: dict[str, LabelEncoder] = {}
+        self.node_encoders: dict[str, list[str]] = {}
         self.account_id_map: dict[str, int] = {}
 
     @property
-    def edge_encoders(self) -> dict[str, LabelEncoder]:
+    def edge_encoders(self) -> dict[str, list[str]]:
         """Exposes the edge encoders from the edge extractor."""
         return self.edge_extractor.edge_encoders
 
