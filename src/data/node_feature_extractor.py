@@ -2,7 +2,6 @@
 
 import polars as pl
 import torch
-from sklearn.preprocessing import StandardScaler
 
 
 class NodeFeatureExtractor:
@@ -82,7 +81,9 @@ class NodeFeatureExtractor:
         return node_df.with_columns([pl.col(c).log1p() for c in financial_cols])
 
     def _scale_tensor(self, feature_tensor: torch.Tensor) -> torch.Tensor:
-        """Normalizes a feature tensor using StandardScaler."""
-        scaler = StandardScaler()
-        scaled_array = scaler.fit_transform(feature_tensor.numpy())
-        return torch.tensor(scaled_array, dtype=torch.float)
+        """Normalizes a feature tensor using PyTorch-native scaling."""
+        mean: torch.Tensor = feature_tensor.mean(dim=0, keepdim=True)
+        std: torch.Tensor = feature_tensor.std(dim=0, correction=0, keepdim=True)
+        std = torch.where(std == 0, torch.ones_like(std), std)
+        return (feature_tensor - mean) / std
+
