@@ -68,15 +68,22 @@ def predict_gnn(
     """Generates sigmoid probabilities for edges using GNN encoder/classifier."""
     encoder.eval()
     classifier.eval()
-    preds: list[np.ndarray] = []
+    preds: list[torch.Tensor] = []
 
     with torch.no_grad():
         for subgraph in loader:
+            input_id = subgraph.input_id
             subgraph = subgraph.to(device)
             batch_x = inject_ego_ids(subgraph, device)
             z = encoder(batch_x, subgraph.edge_index, subgraph.edge_attr)
-            seed_edge_attr = edge_attr[subgraph.input_id.cpu()].to(device)
+            if edge_attr.device == device:
+                seed_edge_attr = edge_attr[input_id.to(device)]
+            else:
+                seed_edge_attr = edge_attr[input_id].to(device)
             out = classifier(z, subgraph.edge_label_index, seed_edge_attr)
-            preds.append(torch.sigmoid(out).cpu().numpy())
+            preds.append(torch.sigmoid(out))
 
-    return np.concatenate(preds)
+    if not preds:
+        return np.empty((0,), dtype=np.float32)
+
+    return torch.cat(preds, dim=0).cpu().numpy()
