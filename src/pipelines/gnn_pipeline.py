@@ -1,6 +1,8 @@
-"""Pipeline de entrenamiento y evaluación para modelos GNN."""
+"""Training and evaluation pipeline for GNN models."""
 
 import tomllib
+
+from torch_geometric.data import Data
 
 from src.data.graph_builder import AMLGraphBuilder
 from src.models.gnn.config import GNNModelConfig
@@ -11,22 +13,19 @@ from src.utils.logger import ProjectLogger
 
 
 class GNNPipeline:
-    """Orquesta la construcción del grafo, entrenamiento y evaluación de la GNN."""
+    """Orchestrates graph construction, training, and evaluation for GNN models."""
 
     def __init__(self, config_path: str) -> None:
-        """Inicializa el pipeline leyendo la configuración TOML."""
+        """Initializes the pipeline by loading the TOML configuration."""
         self.logger = ProjectLogger.get_logger("GNNPipeline")
         with open(config_path, "rb") as f:
             self.config = tomllib.load(f)
 
         self.sync_manager = DataSyncManager()
-        self.prefix = self.config["dataset"]["prefix"]
+        self.prefix: str = self.config["dataset"]["prefix"]
 
-    def run(self) -> None:
-        """Ejecuta el pipeline completo, registrando parámetros y métricas en MLflow."""
-        experiment_name = f"gnn_{self.prefix}"
-        tracker = ExperimentTracker(experiment_name)
-
+    def _build_graph(self) -> Data:
+        """Downloads the dataset and builds the graph representation."""
         self.logger.info("Descargando/Verificando dataset %s...", self.config["dataset"]["handle"])
         dataset_dir = self.sync_manager.download_kaggle_dataset(self.config["dataset"]["handle"])
 
@@ -34,12 +33,14 @@ class GNNPipeline:
         builder = AMLGraphBuilder()
         test_size = float(self.config.get("split", {}).get("test_size", 0.4))
         data = builder.build_graph(dataset_dir, self.prefix, test_size=test_size)
-
-        node_dim = data.x.size(1)
-        edge_dim = data.edge_attr.size(1)
         self.logger.info("Grafo construido: %s", data)
+        return data
 
-        gnn_config = self.config["models"]["GraphSAGE"]
+    def _create_model(self, data: Data) -> GNNFraudDetector:
+        """Configures and initializes the GNN model."""
+        node_dim: int = data.x.size(1)
+        edge_dim: int = data.edge_attr.size(1)
+        gnn_config: dict = self.config["models"]["GraphSAGE"]
 
         self.logger.info("Instanciando GNNFraudDetector (MEGA-PNA)")
         model_config = GNNModelConfig(
@@ -55,27 +56,42 @@ class GNNPipeline:
             final_dropout=gnn_config.get("final_dropout", 0.1),
             num_neighbors=gnn_config.get("num_neighbors", [20, 10]),
         )
-        model = GNNFraudDetector(
+        return GNNFraudDetector(
             graph_data=data,
             config=model_config,
         )
 
+    def _train_and_evaluate(
+        self,
+        model: GNNFraudDetector,
+        data: Data,
+        tracker: ExperimentTracker,
+    ) -> None:
+        """Trains the model and evaluates it on validation and test splits."""
+        gnn_config: dict = self.config["models"]["GraphSAGE"]
         tracker.start_run(run_name="MEGA_PNA")
         tracker.log_params(gnn_config)
 
         self.logger.info("Entrenando el modelo...")
         model.train(data)
 
-        self.logger.info("Evaluando sobre el split de validación...")
-        val_metrics = model.evaluate(data, stage="val")
-        tracker.log_metrics({f"val_{key}": value for key, value in val_metrics.items()})
-
-        self.logger.info("Evaluando sobre el split de test...")
-        test_metrics = model.evaluate(data, stage="test")
-        tracker.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
+        for stage in ["val", "test"]:
+            self.logger.info("Evaluando sobre el split de %s...", stage)
+            metrics = model.evaluate(data, stage=stage)
+            tracker.log_metrics({f"{stage}_{key}": value for key, value in metrics.items()})
 
         tracker.log_model(model.get_underlying_model(), model_name="MEGA_PNA_model")
         tracker.end_run()
+
+    def run(self) -> None:
+        """Runs the complete GNN training and evaluation pipeline."""
+        experiment_name = f"gnn_{self.prefix}"
+        tracker = ExperimentTracker(experiment_name)
+
+        data = self._build_graph()
+        model = self._create_model(data)
+
+        self._train_and_evaluate(model, data, tracker)
 
         self.logger.info("Subiendo resultados al hub...")
         tracker.upload_results_to_hub()
