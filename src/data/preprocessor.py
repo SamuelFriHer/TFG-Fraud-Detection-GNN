@@ -49,9 +49,14 @@ class DataPreprocessor:
         if not categorical_cols:
             return df
 
-        for col in categorical_cols:
-            if col not in self.encoders:
-                self.encoders[col] = df[col].unique().drop_nulls().sort().to_list()
+        cols_to_encode: list[str] = [col for col in categorical_cols if col not in self.encoders]
+        if cols_to_encode:
+            unique_lists: pl.DataFrame = df.select(
+                [pl.col(col).unique().drop_nulls().sort().implode() for col in cols_to_encode]
+            )
+            categories_tuple: tuple[list[str], ...] = unique_lists.row(0)
+            for col, categories in zip(cols_to_encode, categories_tuple):
+                self.encoders[col] = categories
 
         expressions = [
             pl.col(col).cast(pl.Enum(self.encoders[col])).to_physical().cast(pl.Int64)

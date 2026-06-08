@@ -30,13 +30,26 @@ class EdgeFeatureExtractor:
         edge_attr = self._encode_dataframe(edge_features_df, edge_cols)
         return self._scale_tensor(edge_attr)
 
+    def _initialize_encoders(self, df: pl.DataFrame, cols: list[str]) -> None:
+        """Initializes categorical encoders for columns in parallel if not present."""
+        cols_to_encode: list[str] = [
+            col for col in cols if col in df.columns and col not in self.edge_encoders
+        ]
+        if not cols_to_encode:
+            return
+        unique_lists: pl.DataFrame = df.select(
+            [pl.col(col).unique().drop_nulls().sort().implode() for col in cols_to_encode]
+        )
+        categories_tuple: tuple[list[str], ...] = unique_lists.row(0)
+        for col, categories in zip(cols_to_encode, categories_tuple):
+            self.edge_encoders[col] = categories
+
     def _encode_dataframe(self, df: pl.DataFrame, cols: list[str]) -> torch.Tensor:
         """Encodes DataFrame columns to a PyTorch float tensor."""
+        self._initialize_encoders(df, cols)
         expressions = []
         for col in df.columns:
             if col in cols:
-                if col not in self.edge_encoders:
-                    self.edge_encoders[col] = df[col].unique().drop_nulls().sort().to_list()
                 categories = self.edge_encoders[col]
                 expressions.append(
                     pl.col(col)
