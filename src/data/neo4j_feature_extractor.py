@@ -88,9 +88,12 @@ class Neo4jFeatureExtractor:
 
     def run_pipeline(self) -> pl.DataFrame:
         """Runs the entire feature extraction pipeline and returns the DataFrame."""
-        self.project_graph()
-        self.run_algorithms()
-        df = self.extract_features()
-        self.close()
+        try:
+            self.project_graph()
+            self.run_algorithms()
+            df = self.extract_features()
+        finally:
+            self.close()
         self.logger.info("Feature extraction pipeline completed.")
         return df
+

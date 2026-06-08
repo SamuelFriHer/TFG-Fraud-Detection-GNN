@@ -88,9 +88,12 @@ class Neo4jLoader:
 
     def run_pipeline(self, accounts_df: pl.DataFrame, trans_df: pl.DataFrame) -> None:
         """Executes the complete data ingestion pipeline."""
-        self.clean_db()
-        self.create_constraints()
-        self.load_accounts(accounts_df)
-        self.load_transactions(trans_df)
-        self.close()
+        try:
+            self.clean_db()
+            self.create_constraints()
+            self.load_accounts(accounts_df)
+            self.load_transactions(trans_df)
+        finally:
+            self.close()
         self.logger.info("Data ingestion to Neo4j completed.")
+
