@@ -10,7 +10,6 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from torch_geometric.data import Data
 
 
 def find_optimal_threshold(y_true: np.ndarray, probs: np.ndarray) -> tuple[float, float]:
@@ -53,7 +52,7 @@ def evaluate_predictions_at_threshold(
     }
 
 
-def get_labels_for_stage(graph_data: Data, stage: str) -> np.ndarray:
+def get_labels_for_stage(graph_data, stage: str) -> np.ndarray:
     """Extracts ground truth labels for the given stage mask."""
     mask_map = {
         "train": graph_data.train_mask,
