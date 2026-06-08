@@ -10,7 +10,8 @@ from src.models.traditional.svm_model import SVMModel
 @pytest.fixture
 def model() -> SVMModel:
     """Provides a fresh SVMModel instance."""
-    return SVMModel(probability=True)
+    return SVMModel()
+
 
 
 def test_interface(model: SVMModel) -> None:
