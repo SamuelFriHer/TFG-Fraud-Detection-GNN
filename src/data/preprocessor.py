@@ -46,16 +46,18 @@ class DataPreprocessor:
 
     def encode_features(self, df: pl.DataFrame, categorical_cols: list[str]) -> pl.DataFrame:
         """Label-encodes string categorical columns, saving categories for consistency."""
-        encoded_dict: dict[str, pl.Series] = {}
-        for col in df.columns:
-            if col in categorical_cols:
-                if col not in self.encoders:
-                    self.encoders[col] = df[col].unique().drop_nulls().sort().to_list()
-                categories: list[str] = self.encoders[col]
-                encoded_dict[col] = df[col].cast(pl.Enum(categories)).to_physical().cast(pl.Int64)
-            else:
-                encoded_dict[col] = df[col]
-        return pl.DataFrame(encoded_dict)
+        if not categorical_cols:
+            return df
+
+        for col in categorical_cols:
+            if col not in self.encoders:
+                self.encoders[col] = df[col].unique().drop_nulls().sort().to_list()
+
+        expressions = [
+            pl.col(col).cast(pl.Enum(self.encoders[col])).to_physical().cast(pl.Int64)
+            for col in categorical_cols
+        ]
+        return df.with_columns(expressions)
 
     def split_data(
         self,

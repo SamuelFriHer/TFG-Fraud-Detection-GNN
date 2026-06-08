@@ -32,30 +32,30 @@ class EdgeFeatureExtractor:
 
     def _encode_dataframe(self, df: pl.DataFrame, cols: list[str]) -> torch.Tensor:
         """Encodes DataFrame columns to a PyTorch float tensor."""
-        encoded_dict: dict[str, pl.Series] = {}
+        expressions = []
         for col in df.columns:
             if col in cols:
-                encoded_dict[col] = self._encode_categorical_col(df, col)
+                if col not in self.edge_encoders:
+                    self.edge_encoders[col] = df[col].unique().drop_nulls().sort().to_list()
+                categories = self.edge_encoders[col]
+                expressions.append(
+                    pl.col(col)
+                    .cast(pl.Enum(categories))
+                    .to_physical()
+                    .cast(pl.Int64)
+                    .cast(pl.Float32)
+                )
             else:
-                encoded_dict[col] = self._handle_numerical_col(df, col)
+                if df.schema[col] == pl.String:
+                    if col == "Timestamp":
+                        expressions.append(pl.col(col).cast(pl.Float32))
+                    else:
+                        raise ValueError(f"Unhandled string column: {col}")
+                else:
+                    expressions.append(pl.col(col).cast(pl.Float32))
 
-        encoded_df = pl.DataFrame(encoded_dict)
+        encoded_df = df.select(expressions)
         return torch.tensor(encoded_df.to_numpy(), dtype=torch.float)
-
-    def _encode_categorical_col(self, df: pl.DataFrame, col: str) -> pl.Series:
-        """Encodes a categorical column using Polars' native categorical casting."""
-        if col not in self.edge_encoders:
-            self.edge_encoders[col] = df[col].unique().drop_nulls().sort().to_list()
-        categories: list[str] = self.edge_encoders[col]
-        return df[col].cast(pl.Enum(categories)).to_physical().cast(pl.Int64)
-
-    def _handle_numerical_col(self, df: pl.DataFrame, col: str) -> pl.Series:
-        """Handles numeric or timestamp columns."""
-        if df.schema[col] == pl.String:
-            if col == "Timestamp":
-                return df[col].cast(pl.Float32)
-            raise ValueError(f"Columna string no manejada: {col}")
-        return df[col].cast(pl.Float32)
 
     def _scale_tensor(self, feature_tensor: torch.Tensor) -> torch.Tensor:
         """Normalizes a feature tensor using PyTorch-native scaling."""
