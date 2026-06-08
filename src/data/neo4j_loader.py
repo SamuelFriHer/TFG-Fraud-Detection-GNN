@@ -49,7 +49,6 @@ class Neo4jLoader:
     def load_accounts(self, accounts_df: pl.DataFrame, batch_size: int = 10000) -> None:
         """Loads accounts into Neo4j in batches."""
         self.logger.info(f"Loading {len(accounts_df)} accounts into Neo4j...")
-        accounts_list = [{"id": row["Account_ID"]} for row in accounts_df.to_dicts()]
 
         query = """
         UNWIND $batch AS acc
@@ -57,23 +56,14 @@ class Neo4jLoader:
         """
 
         with self.driver.session() as session:
-            for i in range(0, len(accounts_list), batch_size):
-                batch = accounts_list[i : i + batch_size]
+            for i in range(0, len(accounts_df), batch_size):
+                batch_df = accounts_df.slice(i, batch_size)
+                batch = [{"id": row["Account_ID"]} for row in batch_df.to_dicts()]
                 session.run(query, batch=batch)
 
     def load_transactions(self, trans_df: pl.DataFrame, batch_size: int = 10000) -> None:
         """Loads transactions as relationships into Neo4j in batches."""
         self.logger.info(f"Loading {len(trans_df)} transactions into Neo4j...")
-
-        trans_list = [
-            {
-                "from_acc": row["From_Acc"],
-                "to_acc": row["To_Acc"],
-                "amount": float(row["Amount Paid"]),
-                "currency": row["Payment Currency"],
-            }
-            for row in trans_df.to_dicts()
-        ]
 
         query = """
         UNWIND $batch AS tx
@@ -83,8 +73,17 @@ class Neo4jLoader:
         """
 
         with self.driver.session() as session:
-            for i in range(0, len(trans_list), batch_size):
-                batch = trans_list[i : i + batch_size]
+            for i in range(0, len(trans_df), batch_size):
+                batch_df = trans_df.slice(i, batch_size)
+                batch = [
+                    {
+                        "from_acc": row["From_Acc"],
+                        "to_acc": row["To_Acc"],
+                        "amount": float(row["Amount Paid"]),
+                        "currency": row["Payment Currency"],
+                    }
+                    for row in batch_df.to_dicts()
+                ]
                 session.run(query, batch=batch)
 
     def run_pipeline(self, accounts_df: pl.DataFrame, trans_df: pl.DataFrame) -> None:
