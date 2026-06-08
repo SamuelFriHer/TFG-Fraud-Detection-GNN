@@ -80,7 +80,9 @@ def test_gnn_forward_pass() -> None:
     edge_feat_dim = 3
 
     x = torch.rand((num_nodes, node_feat_dim))
-    edge_index = torch.tensor([[0, 1, 2, 3, 0, 1, 2, 3], [1, 2, 3, 4, 2, 3, 4, 0]], dtype=torch.long)
+    edge_index = torch.tensor(
+        [[0, 1, 2, 3, 0, 1, 2, 3], [1, 2, 3, 4, 2, 3, 4, 0]], dtype=torch.long
+    )
     edge_attr = torch.rand((8, edge_feat_dim))
     y = torch.tensor([0, 1, 0, 1, 0, 1, 0, 1], dtype=torch.long)
     train_mask = torch.tensor([True, True, False, False, False, False, False, False])
