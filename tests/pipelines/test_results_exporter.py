@@ -160,6 +160,8 @@ class TestResultsExporter:
         mock_tar = MagicMock(spec=tarfile.TarFile)
         mock_member = MagicMock(spec=tarfile.TarInfo)
         mock_member.name = "safe_file.txt"
+        mock_member.isreg.return_value = True
+        mock_member.isdir.return_value = False
         mock_tar.getmembers.return_value = [mock_member]
 
         with patch("src.pipelines.results_exporter.hasattr", return_value=False):
@@ -173,11 +175,47 @@ class TestResultsExporter:
         mock_tar = MagicMock(spec=tarfile.TarFile)
         mock_member = MagicMock(spec=tarfile.TarInfo)
         mock_member.name = "../unsafe.txt"
+        mock_member.isreg.return_value = True
+        mock_member.isdir.return_value = False
         mock_tar.getmembers.return_value = [mock_member]
 
         with (
             patch("src.pipelines.results_exporter.hasattr", return_value=False),
             pytest.raises(tarfile.ExtractError, match="Attempted path traversal"),
+        ):
+            exporter._safe_extractall(mock_tar, Path("/tmp/base"))
+
+    def test_safe_extractall_fallback_unsupported_type(self, exporter: ResultsExporter) -> None:
+        """Tests that fallback raises ExtractError for symlinks or special files."""
+        import tarfile
+
+        mock_tar = MagicMock(spec=tarfile.TarFile)
+        mock_member = MagicMock(spec=tarfile.TarInfo)
+        mock_member.name = "symlink_file.txt"
+        mock_member.isreg.return_value = False
+        mock_member.isdir.return_value = False
+        mock_tar.getmembers.return_value = [mock_member]
+
+        with (
+            patch("src.pipelines.results_exporter.hasattr", return_value=False),
+            pytest.raises(tarfile.ExtractError, match="Unsupported or unsafe member type"),
+        ):
+            exporter._safe_extractall(mock_tar, Path("/tmp/base"))
+
+    def test_safe_extractall_fallback_base_dir_overwrite(self, exporter: ResultsExporter) -> None:
+        """Tests that fallback raises ExtractError when trying to overwrite base dir with file."""
+        import tarfile
+
+        mock_tar = MagicMock(spec=tarfile.TarFile)
+        mock_member = MagicMock(spec=tarfile.TarInfo)
+        mock_member.name = "."
+        mock_member.isreg.return_value = True
+        mock_member.isdir.return_value = False
+        mock_tar.getmembers.return_value = [mock_member]
+
+        with (
+            patch("src.pipelines.results_exporter.hasattr", return_value=False),
+            pytest.raises(tarfile.ExtractError, match="Attempted to overwrite base directory"),
         ):
             exporter._safe_extractall(mock_tar, Path("/tmp/base"))
 

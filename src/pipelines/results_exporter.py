@@ -109,9 +109,18 @@ class ResultsExporter:
             return
 
         for member in tar.getmembers():
+            if not (member.isreg() or member.isdir()):
+                raise tarfile.ExtractError(
+                    f"Unsupported or unsafe member type in tar file: {member.name}"
+                )
+
             member_path = path / member.name
             if not self._is_safe_path(path, member_path):
                 raise tarfile.ExtractError(f"Attempted path traversal in tar file: {member.name}")
+
+            if member.isreg() and member_path.resolve() == path.resolve():
+                raise tarfile.ExtractError(f"Attempted to overwrite base directory: {member.name}")
+
         tar.extractall(path=path)
 
     def _is_safe_path(self, base_dir: Path, target_path: Path) -> bool:
