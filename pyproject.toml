@@ -25,6 +25,9 @@ dependencies = [
     "torchvision==0.19.1",
     "torchaudio==2.4.1",
     "torch-geometric>=2.5,<3",
+    "pyg_lib",
+    "torch_scatter",
+    "torch_sparse",
     "neo4j>=5.12,<6",
     "graphdatascience>=1.7,<2",
 
