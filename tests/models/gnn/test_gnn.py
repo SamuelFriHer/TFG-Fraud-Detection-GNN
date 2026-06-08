@@ -177,3 +177,34 @@ def test_gnn_weighted_sampler() -> None:
 
     loader = get_train_loader(data, model.config.num_neighbors, model.config.batch_size)
     assert loader.sampler is not None
+
+
+def test_evaluate_predictions() -> None:
+    """Verifies that evaluator functions return correct keys and values."""
+    import numpy as np
+
+    from src.models.gnn.evaluator import (
+        evaluate_predictions,
+        evaluate_predictions_at_threshold,
+    )
+
+    sample_probs = np.array([0.1, 0.2, 0.8, 0.9])
+    sample_y_true = np.array([0, 0, 1, 1])
+
+    computed_metrics = evaluate_predictions(sample_probs, sample_y_true)
+    assert "accuracy" in computed_metrics
+    assert "precision" in computed_metrics
+    assert "recall" in computed_metrics
+    assert "f1" in computed_metrics
+    assert "roc_auc" in computed_metrics
+    assert "pr_auc" in computed_metrics
+    assert "optimal_threshold" in computed_metrics
+
+    # Under optimized threshold (0.8), probs > 0.8 yields predictions [0, 0, 0, 1]
+    # due to strict inequality in prediction thresholding.
+    assert computed_metrics["accuracy"] == 0.75
+    assert abs(computed_metrics["f1"] - 0.666666) < 1e-4
+
+    threshold_metrics = evaluate_predictions_at_threshold(sample_probs, sample_y_true, 0.5)
+    assert threshold_metrics["accuracy"] == 1.0
+    assert threshold_metrics["f1"] == 1.0

@@ -162,7 +162,7 @@ class GNNFraudDetector(IGraphModel):
             "%s Stage - Threshold: %.4f, F1: %.4f, PR-AUC: %.4f, ROC-AUC: %.4f",
             stage.capitalize(),
             self.threshold,
-            metrics["f1_score"],
+            metrics["f1"],
             metrics["pr_auc"],
             metrics["roc_auc"],
         )

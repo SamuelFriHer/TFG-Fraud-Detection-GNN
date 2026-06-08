@@ -12,8 +12,9 @@ from sklearn.metrics import (
 class ClassificationMetricsMixin:
     """Provides reusable binary classification metric computation."""
 
+    @staticmethod
     def compute_classification_metrics(
-        self, y_true: np.ndarray, y_predicted: np.ndarray
+        y_true: np.ndarray, y_predicted: np.ndarray
     ) -> dict[str, float]:
         """Computes accuracy, precision, recall, and F1 for binary classification."""
         return {
