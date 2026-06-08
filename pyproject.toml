@@ -25,6 +25,8 @@ dependencies = [
     "torchvision==0.19.1",
     "torchaudio==2.4.1",
     "torch-geometric>=2.5,<3",
+    "neo4j>=5.12,<6",
+    "graphdatascience>=1.7,<2",
 
     # Explainability (XAI)
     "shap>=0.45,<1",

@@ -1,9 +1,8 @@
 {
   "name": "TFG Fraud Detection GNN",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces",
   "postCreateCommand": "pip install -e '.[dev]'",
   "customizations": {
     "vscode": {

@@ -7,7 +7,10 @@ import torch
 from torch_geometric.data import Data
 
 from src.data.edge_feature_extractor import EdgeFeatureExtractor
+from src.data.neo4j_feature_extractor import Neo4jFeatureExtractor
+from src.data.neo4j_loader import Neo4jLoader
 from src.data.node_feature_extractor import NodeFeatureExtractor
+from src.utils.logger import ProjectLogger
 
 
 class AMLGraphBuilder:
@@ -131,9 +134,25 @@ class AMLGraphBuilder:
         trans_df: pl.DataFrame
         accounts_df, trans_df = self._load_data(dataset_dir, prefix)
         accounts_df, trans_df = self._prepare_accounts_and_transactions(accounts_df, trans_df)
+
+        logger = ProjectLogger.get_logger("AMLGraphBuilder")
+        try:
+            logger.info("Starting Neo4j integration pipeline...")
+            loader = Neo4jLoader()
+            loader.run_pipeline(accounts_df, trans_df)
+
+            extractor = Neo4jFeatureExtractor()
+            neo4j_df = extractor.run_pipeline()
+            logger.info("Neo4j integration pipeline finished successfully.")
+        except Exception as e:
+            logger.warning(f"Neo4j integration failed: {e}. Falling back to basic features.")
+            neo4j_df = None
+
         n_edges: int = len(trans_df)
         train_cutoff: int = int(n_edges * (1.0 - test_size))
-        x: torch.Tensor = self.node_extractor.compute_features(accounts_df, trans_df, train_cutoff)
+        x: torch.Tensor = self.node_extractor.compute_features(
+            accounts_df, trans_df, train_cutoff, neo4j_df
+        )
         edge_index: torch.Tensor
         train_mask: torch.Tensor
         val_mask: torch.Tensor

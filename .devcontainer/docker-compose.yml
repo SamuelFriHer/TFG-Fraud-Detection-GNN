@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspaces:cached
+    command: sleep infinity
+    depends_on:
+      - neo4j
+
+  neo4j:
+    image: neo4j:5.12.0
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/tfg_password
+      - NEO4J_PLUGINS=["graph-data-science", "apoc"]
+      # Restricción de memoria para no exceder los 8GB en total del proyecto
+      - NEO4J_server_memory_pagecache_size=1G
+      - NEO4J_server_memory_heap_initial__size=1G
+      - NEO4J_server_memory_heap_max__size=2G
+    volumes:
+      - neo4j_data:/data
+
+volumes:
+  neo4j_data:

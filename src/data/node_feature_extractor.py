@@ -15,6 +15,7 @@ class NodeFeatureExtractor:
         accounts_df: pl.DataFrame,
         trans_df: pl.DataFrame,
         train_cutoff: int,
+        neo4j_df: pl.DataFrame | None = None,
     ) -> torch.Tensor:
         """Computes structural and financial statistics for nodes."""
         train_trans = trans_df.slice(0, train_cutoff)
@@ -39,7 +40,26 @@ class NodeFeatureExtractor:
             "max_received",
             "min_received",
         ]
-        x_tensor = torch.tensor(node_df.select(feature_cols).to_numpy(), dtype=torch.float)
+
+        if neo4j_df is not None:
+            import numpy as np
+
+            node_df = node_df.join(neo4j_df, on="Account_ID", how="left")
+            base_features = node_df.select(feature_cols).to_numpy()
+            wcc_pr = node_df.select(["wcc_id", "pagerank"]).fill_null(0.0).to_numpy()
+
+            fastrp_list = node_df["fastrp_emb"].to_list()
+            # FastRP dimension is typically 64
+            dim = 64
+            fastrp_arr = np.array(
+                [x if x is not None else [0.0] * dim for x in fastrp_list], dtype=np.float32
+            )
+
+            combined_features = np.hstack([base_features, wcc_pr, fastrp_arr])
+            x_tensor = torch.tensor(combined_features, dtype=torch.float)
+        else:
+            x_tensor = torch.tensor(node_df.select(feature_cols).to_numpy(), dtype=torch.float)
+
         return self._scale_tensor(x_tensor)
 
     def _aggregate_outgoing(self, train_trans: pl.DataFrame) -> pl.DataFrame:
