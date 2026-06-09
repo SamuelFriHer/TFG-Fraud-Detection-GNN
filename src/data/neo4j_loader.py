@@ -51,11 +51,28 @@ class Neo4jLoader:
         self.driver.close()
 
     def clean_db(self) -> None:
-        """Removes all nodes and relationships from the database."""
+        """Removes all nodes and relationships from the database in batches to avoid OOM."""
         self.logger.info("Cleaning Neo4j database...")
         with self.driver.session() as session:
-            session.run("MATCH (n) DETACH DELETE n")
-            # Drop existing constraints just in case
+            try:
+                session.run(
+                    "CALL apoc.periodic.iterate("
+                    "'MATCH ()-[r:TRANSACTED]->() RETURN r', "
+                    "'DELETE r', "
+                    "{batchSize: 50000, parallel: false}"
+                    ")"
+                )
+                session.run(
+                    "CALL apoc.periodic.iterate("
+                    "'MATCH (n:Account) RETURN n', "
+                    "'DELETE n', "
+                    "{batchSize: 50000, parallel: false}"
+                    ")"
+                )
+            except Exception as e:
+                self.logger.warning(f"Batched cleanup failed: {e}. Falling back to detach delete.")
+                session.run("MATCH (n) DETACH DELETE n")
+
             try:
                 session.run("DROP CONSTRAINT account_id_unique IF EXISTS")
             except Exception as e:
