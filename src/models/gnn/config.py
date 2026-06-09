@@ -21,6 +21,7 @@ class GNNModelConfig:
     num_neighbors: list[int] = field(default_factory=lambda: [20, 10])
 
     def __post_init__(self) -> None:
-        """Ensures that in_channels is populated."""
-        if self.in_channels is None:
-            object.__setattr__(self, "in_channels", self.node_feat_dim + 1)
+        """Ensures that in_channels is populated and correctly set to node_feat_dim + 1."""
+        expected_in_channels = self.node_feat_dim + 1
+        if self.in_channels != expected_in_channels:
+            object.__setattr__(self, "in_channels", expected_in_channels)
