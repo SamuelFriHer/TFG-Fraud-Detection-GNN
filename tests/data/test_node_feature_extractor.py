@@ -88,7 +88,7 @@ class TestNodeFeatureExtractor:
             neo4j_df=sample_neo4j_df,
         )
 
-        assert features.shape == (3, 76)
+        assert features.shape == (3, 75)
 
         for col_idx in range(11):
             col_vals: torch.Tensor = features[:, col_idx]
@@ -98,10 +98,7 @@ class TestNodeFeatureExtractor:
             if std_val > 1e-5:
                 assert abs(std_val - 1.0) < 1e-5
 
-        wcc_vals: list[float] = features[:, 11].tolist()
-        assert wcc_vals == [100.0, 200.0, 100.0]
-
-        fastrp_vals: torch.Tensor = features[:, 12:]
+        fastrp_vals: torch.Tensor = features[:, 11:]
         assert torch.allclose(fastrp_vals[0], torch.tensor([0.1] * 64))
         assert torch.allclose(fastrp_vals[1], torch.tensor([0.2] * 64))
         assert torch.allclose(fastrp_vals[2], torch.tensor([0.3] * 64))

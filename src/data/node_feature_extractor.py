@@ -74,9 +74,6 @@ class NodeFeatureExtractor:
         continuous_tensor: torch.Tensor = torch.tensor(continuous_np, dtype=torch.float)
         scaled_continuous: torch.Tensor = self._scale_tensor(continuous_tensor)
 
-        wcc_id: np.ndarray = joined_df.select("wcc_id").fill_null(0.0).to_numpy()
-        wcc_tensor: torch.Tensor = torch.tensor(wcc_id, dtype=torch.float)
-
         fastrp_list: list[list[float] | None] = joined_df["fastrp_emb"].to_list()
         dim: int = 64
         fastrp_arr: np.ndarray = np.array(
@@ -84,7 +81,7 @@ class NodeFeatureExtractor:
         )
         fastrp_tensor: torch.Tensor = torch.tensor(fastrp_arr, dtype=torch.float)
 
-        return torch.cat([scaled_continuous, wcc_tensor, fastrp_tensor], dim=1)
+        return torch.cat([scaled_continuous, fastrp_tensor], dim=1)
 
     def _aggregate_outgoing(self, train_trans: pl.DataFrame) -> pl.DataFrame:
         """Aggregates outgoing transactions statistics."""
