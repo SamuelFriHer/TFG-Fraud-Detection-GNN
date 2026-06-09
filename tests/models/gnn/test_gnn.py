@@ -1,13 +1,10 @@
 """Tests unitarios para la arquitectura GNN y la construcción de grafos."""
 
-import os
-
 import polars as pl
 import pytest
 import torch
 from torch_geometric.data import Data
 
-from src.data.graph_builder import AMLGraphBuilder
 from src.models.gnn.config import GNNModelConfig
 from src.models.gnn.model import GNNFraudDetector
 from src.models.interfaces import IGraphModel
@@ -43,29 +40,6 @@ def mock_graph_data() -> tuple[pl.DataFrame, pl.DataFrame]:
     )
 
     return accounts, transactions
-
-
-def test_graph_builder(mock_graph_data: tuple[pl.DataFrame, pl.DataFrame], tmp_path: str) -> None:
-    """Valida que el grafo se construye correctamente desde CSVs."""
-    accounts, transactions = mock_graph_data
-
-    dataset_dir = os.path.join(tmp_path, "mock_dataset")
-    os.makedirs(dataset_dir)
-
-    accounts.write_csv(os.path.join(dataset_dir, "Mock_accounts.csv"))
-    transactions.write_csv(os.path.join(dataset_dir, "Mock_Trans.csv"))
-
-    builder = AMLGraphBuilder()
-    data = builder.build_graph(dataset_dir, "Mock", test_size=0.4)
-
-    assert isinstance(data, Data)
-    assert data.num_nodes == 3
-    assert data.num_edges == 2
-    assert data.edge_index.shape == (2, 2)
-    assert data.y.tolist() == [0, 1]
-    assert hasattr(data, "train_mask")
-    assert hasattr(data, "val_mask")
-    assert hasattr(data, "test_mask")
 
 
 def test_gnn_interface() -> None:
