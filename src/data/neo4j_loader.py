@@ -22,6 +22,30 @@ class Neo4jLoader:
         self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
         self.logger = ProjectLogger.get_logger("Neo4jLoader")
 
+        max_retries: int = 2 if "PYTEST_CURRENT_TEST" in os.environ else 30
+        self._wait_for_connection(max_retries=max_retries)
+
+    def _wait_for_connection(self, max_retries: int = 30, delay: float = 2.0) -> None:
+        """Waits for the Neo4j server to be available and accepting connections."""
+        import time
+
+        from neo4j.exceptions import ServiceUnavailable
+
+        for attempt in range(max_retries):
+            try:
+                self.driver.verify_connectivity()
+                self.logger.info("Successfully connected to Neo4j database.")
+                return
+            except ServiceUnavailable as e:
+                if attempt == max_retries - 1:
+                    self.logger.critical("Could not connect to Neo4j after multiple retries.")
+                    raise e
+                self.logger.warning(
+                    f"Neo4j not ready (attempt {attempt + 1}/{max_retries}). "
+                    f"Retrying in {delay}s..."
+                )
+                time.sleep(delay)
+
     def close(self) -> None:
         """Closes the Neo4j driver connection."""
         self.driver.close()
@@ -96,4 +120,3 @@ class Neo4jLoader:
         finally:
             self.close()
         self.logger.info("Data ingestion to Neo4j completed.")
-
