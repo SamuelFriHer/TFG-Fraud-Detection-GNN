@@ -6,7 +6,8 @@ prefix = "HI-Large"
 test_size = 0.4
 random_state = 42
 
-[models.GraphSAGE]
+[models.MEGA_PNA]
+in_channels = 75
 hidden_channels = 128
 num_layers = 2
 learning_rate = 0.001

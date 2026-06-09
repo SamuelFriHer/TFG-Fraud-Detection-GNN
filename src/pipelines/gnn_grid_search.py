@@ -67,13 +67,14 @@ class GNNGridSearchPipeline:
         edge_feat_dim: int,
     ) -> GNNModelConfig:
         """Crea la configuración del modelo a partir de hyperparámetros fijos y variables."""
-        base_gnn_config = self.config.get("models", {}).get("GraphSAGE", {})
+        base_gnn_config = self.config.get("models", {}).get("MEGA_PNA", {})
         full_params = base_gnn_config.copy()
         full_params.update(params)
 
         return GNNModelConfig(
             node_feat_dim=node_feat_dim,
             edge_feat_dim=edge_feat_dim,
+            in_channels=int(full_params["in_channels"]) if "in_channels" in full_params else None,
             hidden_channels=int(full_params["hidden_channels"]),
             num_layers=int(full_params.get("num_layers", 2)),
             lr=float(full_params["learning_rate"]),
@@ -130,7 +131,7 @@ class GNNGridSearchPipeline:
         tracker.start_run(run_name=run_name)
 
         # Registrar hyperparámetros fijos y variables
-        base_gnn_config = self.config.get("models", {}).get("GraphSAGE", {})
+        base_gnn_config = self.config.get("models", {}).get("MEGA_PNA", {})
         full_params = base_gnn_config.copy()
         full_params.update(params)
         tracker.log_params(full_params)

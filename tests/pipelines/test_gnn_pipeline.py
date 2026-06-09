@@ -22,7 +22,8 @@ def mock_config_path(tmp_path) -> str:
     [split]
     test_size = 0.3
 
-    [models.GraphSAGE]
+    [models.MEGA_PNA]
+    in_channels = 6
     hidden_channels = 32
     learning_rate = 0.005
     dropout = 0.2
@@ -83,6 +84,7 @@ class TestGNNPipeline:
             config: GNNModelConfig = kwargs["config"]
             assert config.node_feat_dim == 5
             assert config.edge_feat_dim == 3
+            assert config.in_channels == 6
             assert config.hidden_channels == 32
             assert config.lr == 0.005
             assert config.dropout == 0.2

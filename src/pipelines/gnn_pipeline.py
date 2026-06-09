@@ -40,12 +40,13 @@ class GNNPipeline:
         """Configures and initializes the GNN model."""
         node_dim: int = data.x.size(1)
         edge_dim: int = data.edge_attr.size(1)
-        gnn_config: dict = self.config["models"]["GraphSAGE"]
+        gnn_config: dict = self.config["models"]["MEGA_PNA"]
 
         self.logger.info("Instanciando GNNFraudDetector (MEGA-PNA)")
         model_config = GNNModelConfig(
             node_feat_dim=node_dim,
             edge_feat_dim=edge_dim,
+            in_channels=gnn_config.get("in_channels"),
             hidden_channels=gnn_config.get("hidden_channels", 64),
             num_layers=gnn_config.get("num_layers", 2),
             lr=gnn_config.get("learning_rate", 0.001),
@@ -68,7 +69,7 @@ class GNNPipeline:
         tracker: ExperimentTracker,
     ) -> None:
         """Trains the model and evaluates it on validation and test splits."""
-        gnn_config: dict = self.config["models"]["GraphSAGE"]
+        gnn_config: dict = self.config["models"]["MEGA_PNA"]
         tracker.start_run(run_name="MEGA_PNA")
         tracker.log_params(gnn_config)
 
