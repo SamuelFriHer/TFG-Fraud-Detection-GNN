@@ -20,10 +20,10 @@ class GNNTrainingContext:
     device: torch.device
 
 
-def inject_ego_ids(subgraph: Data, device: torch.device) -> torch.Tensor:
+def inject_ego_ids(subgraph: Data) -> torch.Tensor:
     """Concatenates ego-ID flags to node features for seed edge endpoints."""
-    num_nodes = subgraph.x.size(0)
-    ego_flag = torch.zeros((num_nodes, 1), device=device, dtype=subgraph.x.dtype)
+    num_nodes: int = subgraph.x.size(0)
+    ego_flag: torch.Tensor = subgraph.x.new_zeros((num_nodes, 1))
     ego_flag[subgraph.edge_label_index[0]] = 1.0
     ego_flag[subgraph.edge_label_index[1]] = 1.0
     return torch.cat([subgraph.x, ego_flag], dim=-1)
@@ -41,7 +41,7 @@ def train_gnn_epoch(context: GNNTrainingContext) -> float:
         subgraph = subgraph.to(context.device)
         context.optimizer.zero_grad()
 
-        batch_x = inject_ego_ids(subgraph, context.device)
+        batch_x: torch.Tensor = inject_ego_ids(subgraph)
         z = context.encoder(batch_x, subgraph.edge_index, subgraph.edge_attr)
         seed_edge_attr: torch.Tensor = context.train_edge_attr[subgraph.input_id]
         out = context.classifier(z, subgraph.edge_label_index, seed_edge_attr)
@@ -74,7 +74,7 @@ def predict_gnn(
         for subgraph in loader:
             input_id = subgraph.input_id
             subgraph = subgraph.to(device)
-            batch_x = inject_ego_ids(subgraph, device)
+            batch_x: torch.Tensor = inject_ego_ids(subgraph)
             z = encoder(batch_x, subgraph.edge_index, subgraph.edge_attr)
             if edge_attr.device == device:
                 seed_edge_attr = edge_attr[input_id.to(device)]

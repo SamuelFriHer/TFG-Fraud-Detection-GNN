@@ -87,20 +87,18 @@ class MEGAPNAEncoder(nn.Module):
         self, edge_index: torch.Tensor, edge_attr: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Inyección de aristas inversas para paso de mensajes bidireccional."""
-        num_edges = edge_index.size(1)
-        device = edge_index.device
-        dtype = edge_attr.dtype
+        num_edges: int = edge_index.size(1)
 
-        fwd_flags = torch.ones((num_edges, 1), device=device, dtype=dtype)
-        rev_flags = torch.zeros((num_edges, 1), device=device, dtype=dtype)
+        fwd_flags: torch.Tensor = edge_attr.new_ones((num_edges, 1))
+        rev_flags: torch.Tensor = edge_attr.new_zeros((num_edges, 1))
 
-        rev_edge_index = edge_index[[1, 0]]
+        rev_edge_index: torch.Tensor = edge_index[[1, 0]]
 
-        final_edge_index = torch.cat([edge_index, rev_edge_index], dim=1)
+        final_edge_index: torch.Tensor = torch.cat([edge_index, rev_edge_index], dim=1)
 
-        fwd_attr = torch.cat([edge_attr, fwd_flags], dim=-1)
-        rev_attr = torch.cat([edge_attr, rev_flags], dim=-1)
-        final_edge_attr = torch.cat([fwd_attr, rev_attr], dim=0)
+        fwd_attr: torch.Tensor = torch.cat([edge_attr, fwd_flags], dim=-1)
+        rev_attr: torch.Tensor = torch.cat([edge_attr, rev_flags], dim=-1)
+        final_edge_attr: torch.Tensor = torch.cat([fwd_attr, rev_attr], dim=0)
 
         return final_edge_index, final_edge_attr
 
