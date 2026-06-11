@@ -98,8 +98,10 @@ class Neo4jLoader:
 
         with self.driver.session() as session:
             for i in range(0, len(accounts_df), batch_size):
-                batch_df = accounts_df.slice(i, batch_size)
-                batch = [{"id": row["Account_ID"]} for row in batch_df.to_dicts()]
+                batch_df: pl.DataFrame = accounts_df.slice(i, batch_size)
+                batch: list[dict[str, str]] = batch_df.select(
+                    pl.col("Account_ID").alias("id")
+                ).to_dicts()
                 session.run(query, batch=batch)
 
     def load_transactions(self, trans_df: pl.DataFrame, batch_size: int = 10000) -> None:
@@ -115,16 +117,15 @@ class Neo4jLoader:
 
         with self.driver.session() as session:
             for i in range(0, len(trans_df), batch_size):
-                batch_df = trans_df.slice(i, batch_size)
-                batch = [
-                    {
-                        "from_acc": row["From_Acc"],
-                        "to_acc": row["To_Acc"],
-                        "amount": float(row["Amount Paid"]),
-                        "currency": row["Payment Currency"],
-                    }
-                    for row in batch_df.to_dicts()
-                ]
+                batch_df: pl.DataFrame = trans_df.slice(i, batch_size)
+                batch: list[dict[str, str | float]] = batch_df.select(
+                    [
+                        pl.col("From_Acc").alias("from_acc"),
+                        pl.col("To_Acc").alias("to_acc"),
+                        pl.col("Amount Paid").cast(pl.Float64).alias("amount"),
+                        pl.col("Payment Currency").alias("currency"),
+                    ]
+                ).to_dicts()
                 session.run(query, batch=batch)
 
     def run_pipeline(self, accounts_df: pl.DataFrame, trans_df: pl.DataFrame) -> None:
