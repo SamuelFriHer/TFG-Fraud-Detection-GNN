@@ -43,7 +43,7 @@ def train_gnn_epoch(context: GNNTrainingContext) -> float:
 
         batch_x = inject_ego_ids(subgraph, context.device)
         z = context.encoder(batch_x, subgraph.edge_index, subgraph.edge_attr)
-        seed_edge_attr = context.train_edge_attr[subgraph.input_id.cpu()].to(context.device)
+        seed_edge_attr: torch.Tensor = context.train_edge_attr[subgraph.input_id]
         out = context.classifier(z, subgraph.edge_label_index, seed_edge_attr)
 
         loss = context.criterion(out, subgraph.edge_label.float())

@@ -92,7 +92,7 @@ class GNNFraudDetector(IGraphModel):
     ) -> GNNTrainingContext:
         """Creates the training context for the training epochs."""
         loader = get_train_loader(graph_data, self.config.num_neighbors, self.config.batch_size)
-        train_edge_attr = graph_data.edge_attr[graph_data.train_mask]
+        train_edge_attr: torch.Tensor = graph_data.edge_attr[graph_data.train_mask].to(self.device)
         return GNNTrainingContext(
             self.encoder,
             self.classifier,
