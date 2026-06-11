@@ -16,4 +16,4 @@ loss_type = "weighted"
 pos_weight = 5.0
 dropout = 0.3
 final_dropout = 0.3
-num_neighbors = [20, 10]
+num_neighbors = [10, 5]
