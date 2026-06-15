@@ -203,3 +203,33 @@ def test_gnn_config_in_channels() -> None:
         in_channels=20,
     )
     assert config_incorrect.in_channels == node_feat_dim + 1
+
+
+def test_train_gnn_epoch_empty_loader() -> None:
+    """Verify train_gnn_epoch handles an empty loader correctly by returning 0.0."""
+    from unittest.mock import MagicMock
+
+    from torch import nn, optim
+
+    from src.models.gnn.utils import GNNTrainingContext, train_gnn_epoch
+
+    dummy_encoder: nn.Module = nn.Module()
+    dummy_classifier: nn.Module = nn.Module()
+    empty_loader: list = []
+    dummy_optimizer: MagicMock = MagicMock(spec=optim.Optimizer)
+    dummy_criterion: nn.Module = nn.Module()
+    empty_train_edge_attr: torch.Tensor = torch.empty((0,))
+    target_device: torch.device = torch.device("cpu")
+
+    training_context: GNNTrainingContext = GNNTrainingContext(
+        encoder=dummy_encoder,
+        classifier=dummy_classifier,
+        loader=empty_loader,  # type: ignore
+        optimizer=dummy_optimizer,
+        criterion=dummy_criterion,
+        train_edge_attr=empty_train_edge_attr,
+        device=target_device,
+    )
+
+    epoch_loss: float = train_gnn_epoch(training_context)
+    assert epoch_loss == 0.0
