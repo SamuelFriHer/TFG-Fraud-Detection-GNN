@@ -13,6 +13,8 @@ from src.models.classification_metrics import ClassificationMetricsMixin
 
 def find_optimal_threshold(y_true: np.ndarray, probs: np.ndarray) -> tuple[float, float]:
     """Finds the decision threshold that maximizes the F1-Score."""
+    if not np.any(y_true == 1):
+        return 0.5, 0.0
     precisions, recalls, thresholds = precision_recall_curve(y_true, probs)
     f1_scores = 2 * precisions * recalls / (precisions + recalls + 1e-10)
     best_idx = int(np.argmax(f1_scores))
