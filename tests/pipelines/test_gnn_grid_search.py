@@ -49,25 +49,23 @@ class TestGNNGridSearchPipeline:
         assert pipeline.config["dataset"]["handle"] == "test/dataset"
         assert pipeline.sync_manager is not None
 
-    def test_load_graph_data(self, pipeline: GNNGridSearchPipeline) -> None:
+    def test_load_graph(self, pipeline: GNNGridSearchPipeline) -> None:
         """Verifies dataset download and graph construction."""
-        mock_data = MagicMock(spec=Data)
-        mock_data.x = torch.rand((10, 5))
-        mock_data.edge_attr = torch.rand((20, 3))
-        mock_data.num_nodes = 10
-        mock_data.num_edges = 20
+        mock_graph = MagicMock(spec=Data)
+        mock_graph.x = torch.rand((10, 5))
+        mock_graph.edge_attr = torch.rand((20, 3))
+        mock_graph.num_nodes = 10
+        mock_graph.num_edges = 20
 
         with patch("src.pipelines.gnn_grid_search.AMLGraphBuilder") as mock_builder_cls:
             mock_builder = mock_builder_cls.return_value
-            mock_builder.build_graph.return_value = mock_data
+            mock_builder.build_graph.return_value = mock_graph
 
             pipeline.sync_manager.download_kaggle_dataset.return_value = "mock_dir"
 
-            data, node_dim, edge_dim = pipeline._load_graph_data()
+            graph = pipeline._load_graph()
 
-            assert data == mock_data
-            assert node_dim == 5
-            assert edge_dim == 3
+            assert graph == mock_graph
             pipeline.sync_manager.download_kaggle_dataset.assert_called_once_with("test/dataset")
             mock_builder.build_graph.assert_called_once_with(
                 "mock_dir", "test_prefix", test_size=0.3
@@ -81,8 +79,12 @@ class TestGNNGridSearchPipeline:
 
     def test_create_model_config(self, pipeline: GNNGridSearchPipeline) -> None:
         """Verifies correct construction of the GNNModelConfig."""
+        mock_graph = MagicMock(spec=Data)
+        mock_graph.x = torch.rand((10, 10))
+        mock_graph.edge_attr = torch.rand((20, 4))
+
         params = {"pos_weight": 5.0, "num_neighbors": [10, 5]}
-        config = pipeline._create_model_config(params, node_feat_dim=10, edge_feat_dim=4)
+        config = pipeline._create_model_config(params, mock_graph)
 
         assert isinstance(config, GNNModelConfig)
         assert config.node_feat_dim == 10
@@ -97,19 +99,19 @@ class TestGNNGridSearchPipeline:
     def test_train_and_evaluate(self, pipeline: GNNGridSearchPipeline) -> None:
         """Verifies training steps and metric recording."""
         mock_model = MagicMock(spec=GNNFraudDetector)
-        mock_model.evaluate.side_effect = lambda data, stage: (
+        mock_model.evaluate.side_effect = lambda graph_obj, stage: (
             {"f1": 0.8} if stage == "val" else {"f1": 0.7}
         )
         mock_model.get_underlying_model.return_value = "underlying_model"
 
-        mock_data = MagicMock(spec=Data)
+        mock_graph = MagicMock(spec=Data)
         mock_tracker = MagicMock()
 
-        pipeline._train_and_evaluate(mock_model, mock_data, mock_tracker)
+        pipeline._train_and_evaluate(mock_model, mock_graph, mock_tracker)
 
-        mock_model.train.assert_called_once_with(mock_data)
-        mock_model.evaluate.assert_any_call(mock_data, stage="val")
-        mock_model.evaluate.assert_any_call(mock_data, stage="test")
+        mock_model.train.assert_called_once_with(mock_graph)
+        mock_model.evaluate.assert_any_call(mock_graph, stage="val")
+        mock_model.evaluate.assert_any_call(mock_graph, stage="test")
         mock_tracker.log_metrics.assert_any_call({"val_f1": 0.8})
         mock_tracker.log_metrics.assert_any_call({"test_f1": 0.7})
         mock_tracker.log_model.assert_called_once_with("underlying_model", model_name="model")
@@ -128,10 +130,9 @@ class TestGNNGridSearchPipeline:
 
     def test_run_single_experiment(self, pipeline: GNNGridSearchPipeline) -> None:
         """Verifies that a single run proceeds, logs params, and handles errors."""
-        mock_data = MagicMock(spec=Data)
+        mock_graph = MagicMock(spec=Data)
         mock_tracker = MagicMock()
-        keys = ["pos_weight", "num_neighbors"]
-        combo = (5.0, [10, 5])
+        params = {"pos_weight": 5.0, "num_neighbors": [10, 5]}
 
         with (
             patch.object(pipeline, "_create_model_config") as mock_create_config,
@@ -143,32 +144,28 @@ class TestGNNGridSearchPipeline:
             pipeline._run_single_experiment(
                 idx=1,
                 total_runs=1,
-                keys=keys,
-                combo=combo,
-                data=mock_data,
-                node_dim=10,
-                edge_dim=4,
+                params=params,
+                graph=mock_graph,
                 tracker=mock_tracker,
             )
 
             mock_tracker.start_run.assert_called_once_with(run_name="MEGA_PNA_Grid_001")
             mock_tracker.log_params.assert_called_once()
             mock_create_config.assert_called_once_with(
-                {"pos_weight": 5.0, "num_neighbors": [10, 5]}, 10, 4
+                {"pos_weight": 5.0, "num_neighbors": [10, 5]}, mock_graph
             )
             mock_detector_cls.assert_called_once_with(
-                graph_data=mock_data, config=mock_create_config.return_value
+                graph_data=mock_graph, config=mock_create_config.return_value
             )
-            mock_train_eval.assert_called_once_with(mock_detector, mock_data, mock_tracker)
+            mock_train_eval.assert_called_once_with(mock_detector, mock_graph, mock_tracker)
             mock_tracker.end_run.assert_called_once()
             mock_cleanup.assert_called_once_with(mock_detector)
 
     def test_run_single_experiment_exception(self, pipeline: GNNGridSearchPipeline) -> None:
         """Verifies exceptions during experiment run are logged but do not crash the pipeline."""
-        mock_data = MagicMock(spec=Data)
+        mock_graph = MagicMock(spec=Data)
         mock_tracker = MagicMock()
-        keys = ["pos_weight", "num_neighbors"]
-        combo = (5.0, [10, 5])
+        params = {"pos_weight": 5.0, "num_neighbors": [10, 5]}
 
         with (
             patch.object(
@@ -180,11 +177,8 @@ class TestGNNGridSearchPipeline:
             pipeline._run_single_experiment(
                 idx=1,
                 total_runs=1,
-                keys=keys,
-                combo=combo,
-                data=mock_data,
-                node_dim=10,
-                edge_dim=4,
+                params=params,
+                graph=mock_graph,
                 tracker=mock_tracker,
             )
             mock_tracker.end_run.assert_called_once()
@@ -193,10 +187,10 @@ class TestGNNGridSearchPipeline:
 
     def test_run(self, pipeline: GNNGridSearchPipeline) -> None:
         """Verifies full grid execution sequence."""
-        mock_data = MagicMock(spec=Data)
+        mock_graph = MagicMock(spec=Data)
 
         with (
-            patch.object(pipeline, "_load_graph_data", return_value=(mock_data, 10, 4)),
+            patch.object(pipeline, "_load_graph", return_value=mock_graph),
             patch.object(
                 pipeline, "_generate_grid_combinations", return_value=(["p"], [(1.0,), (2.0,)])
             ),

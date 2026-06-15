@@ -32,7 +32,7 @@ class GNNGridSearchPipeline:
         self.sync_manager = DataSyncManager()
         self.prefix = self.config["dataset"]["prefix"]
 
-    def _load_graph_data(self) -> tuple[Data, int, int]:
+    def _load_graph(self) -> Data:
         """Carga y construye el grafo una única vez."""
         self.logger.info(
             "Verificando dataset %s para Grid Search", self.config["dataset"]["handle"]
@@ -42,12 +42,12 @@ class GNNGridSearchPipeline:
         self.logger.info("Construyendo grafo en memoria para %s", self.prefix)
         builder = AMLGraphBuilder()
         test_size = float(self.config.get("split", {}).get("test_size", 0.4))
-        data = builder.build_graph(dataset_dir, self.prefix, test_size=test_size)
+        graph = builder.build_graph(dataset_dir, self.prefix, test_size=test_size)
 
-        node_dim = int(data.x.size(1))
-        edge_dim = int(data.edge_attr.size(1))
-        self.logger.info("Grafo construido. Nodos: %d, Aristas: %d", data.num_nodes, data.num_edges)
-        return data, node_dim, edge_dim
+        self.logger.info(
+            "Grafo construido. Nodos: %d, Aristas: %d", graph.num_nodes, graph.num_edges
+        )
+        return graph
 
     def _generate_grid_combinations(self) -> tuple[list[str], list[tuple[Any, ...]]]:
         """Genera el espacio de búsqueda e itertools.product de combinaciones."""
@@ -63,8 +63,7 @@ class GNNGridSearchPipeline:
     def _create_model_config(
         self,
         params: dict[str, Any],
-        node_feat_dim: int,
-        edge_feat_dim: int,
+        graph: Data,
     ) -> GNNModelConfig:
         """Crea la configuración del modelo a partir de hyperparámetros fijos y variables."""
         base_gnn_config = self.config.get("models", {}).get("MEGA_PNA", {})
@@ -72,8 +71,8 @@ class GNNGridSearchPipeline:
         full_params.update(params)
 
         return GNNModelConfig(
-            node_feat_dim=node_feat_dim,
-            edge_feat_dim=edge_feat_dim,
+            node_feat_dim=int(graph.x.size(1)),
+            edge_feat_dim=int(graph.edge_attr.size(1)),
             in_channels=int(full_params["in_channels"]) if "in_channels" in full_params else None,
             hidden_channels=int(full_params["hidden_channels"]),
             num_layers=int(full_params.get("num_layers", 2)),
@@ -89,17 +88,17 @@ class GNNGridSearchPipeline:
     def _train_and_evaluate(
         self,
         model: GNNFraudDetector,
-        data: Data,
+        graph: Data,
         tracker: ExperimentTracker,
     ) -> None:
         """Ejecuta el entrenamiento y evaluación del modelo, registrando métricas y modelo."""
-        model.train(data)
+        model.train(graph)
 
         # Evaluar
-        val_metrics = model.evaluate(data, stage="val")
+        val_metrics = model.evaluate(graph, stage="val")
         tracker.log_metrics({f"val_{k}": v for k, v in val_metrics.items()})
 
-        test_metrics = model.evaluate(data, stage="test")
+        test_metrics = model.evaluate(graph, stage="test")
         tracker.log_metrics({f"test_{k}": v for k, v in test_metrics.items()})
 
         # Guardar el modelo para este run
@@ -116,15 +115,11 @@ class GNNGridSearchPipeline:
         self,
         idx: int,
         total_runs: int,
-        keys: list[str],
-        combo: tuple[Any, ...],
-        data: Data,
-        node_dim: int,
-        edge_dim: int,
+        params: dict[str, Any],
+        graph: Data,
         tracker: ExperimentTracker,
     ) -> None:
         """Ejecuta una iteración individual del grid search."""
-        params = dict(zip(keys, combo))
         run_name = f"MEGA_PNA_Grid_{idx:03d}"
         self.logger.info("--- [Run %d/%d] Parámetros: %s ---", idx, total_runs, params)
 
@@ -137,11 +132,11 @@ class GNNGridSearchPipeline:
         tracker.log_params(full_params)
 
         try:
-            model_config = self._create_model_config(params, node_dim, edge_dim)
-            model = GNNFraudDetector(graph_data=data, config=model_config)
-            self._train_and_evaluate(model, data, tracker)
-        except Exception as e:
-            self.logger.error("Error en run %d: %s", idx, str(e))
+            model_config = self._create_model_config(params, graph)
+            model = GNNFraudDetector(graph_data=graph, config=model_config)
+            self._train_and_evaluate(model, graph, tracker)
+        except Exception as error_exception:
+            self.logger.error("Error en run %d: %s", idx, str(error_exception))
         finally:
             tracker.end_run()
             if "model" in locals():
@@ -152,15 +147,20 @@ class GNNGridSearchPipeline:
         experiment_name = f"gnn_grid_{self.prefix}"
         tracker = ExperimentTracker(experiment_name)
 
-        data, node_dim, edge_dim = self._load_graph_data()
+        graph = self._load_graph()
         keys, combinations = self._generate_grid_combinations()
         total_runs = len(combinations)
 
         self.logger.info("Iniciando Grid Search con %d combinaciones", total_runs)
 
         for idx, combo in enumerate(combinations, start=1):
+            params = dict(zip(keys, combo))
             self._run_single_experiment(
-                idx, total_runs, keys, combo, data, node_dim, edge_dim, tracker
+                idx=idx,
+                total_runs=total_runs,
+                params=params,
+                graph=graph,
+                tracker=tracker,
             )
 
         self.logger.info("Grid search finalizado. Subiendo resultados al hub...")
