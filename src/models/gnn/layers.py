@@ -102,47 +102,47 @@ class MEGAPNAEncoder(nn.Module):
 
         return final_edge_index, final_edge_attr
 
+    def _process_layer(
+        self,
+        layer_idx: int,
+        x: torch.Tensor,
+        edge_index: torch.Tensor,
+        edge_attr: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Apply neighborhood aggregation and edge updates for a single layer."""
+        x_new: torch.Tensor = self.convs[layer_idx](x, edge_index, edge_attr)
+        x_new = functional_interface.relu(x_new) + x
+        x_out: torch.Tensor = functional_interface.dropout(
+            x_new, p=self.dropout, training=self.training
+        )
+
+        x_src: torch.Tensor = x_out[edge_index[0]]
+        x_dst: torch.Tensor = x_out[edge_index[1]]
+        mlp_in: torch.Tensor = torch.cat([edge_attr, x_src, x_dst], dim=-1)
+        edge_attr_out: torch.Tensor = functional_interface.relu(self.edge_mlps[layer_idx](mlp_in))
+
+        return x_out, edge_attr_out
+
     def forward(
         self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor
     ) -> torch.Tensor:
-        """Realiza el paso forward a través de las capas MEGA-PNA."""
-        num_nodes = x.size(0)
+        """Perform the forward pass through the MEGA-PNA layers."""
+        num_nodes: int = x.size(0)
 
-        # 1. Multi-Edge Aggregation
-        flat_edge_index, flat_edge_attr = self._flatten_edges(edge_index, edge_attr, num_nodes)
-
-        # 2. Reverse Message Passing
-        processed_edge_index, processed_edge_attr = self._reverse_mp(
-            flat_edge_index, flat_edge_attr
+        flat_edges: tuple[torch.Tensor, torch.Tensor] = self._flatten_edges(
+            edge_index, edge_attr, num_nodes
         )
+        flat_index: torch.Tensor = flat_edges[0]
+        flat_attr: torch.Tensor = flat_edges[1]
 
-        # Proyección inicial de nodos
-        x = self.node_proj(x)
-        x = functional_interface.relu(x)
+        processed_edges: tuple[torch.Tensor, torch.Tensor] = self._reverse_mp(flat_index, flat_attr)
+        curr_index: torch.Tensor = processed_edges[0]
+        curr_attr: torch.Tensor = processed_edges[1]
 
-        curr_edge_index = processed_edge_index
-        curr_edge_attr = processed_edge_attr
+        x = functional_interface.relu(self.node_proj(x))
 
-        # 3. Neighborhood Aggregation y Edge Updates (emlps)
         for i in range(self.num_layers):
-            conv = self.convs[i]
-            edge_mlp = self.edge_mlps[i]
-
-            # PNA Conv
-            x_new = conv(x, curr_edge_index, curr_edge_attr)
-            x_new = functional_interface.relu(x_new)
-            x_new = x_new + x
-            x = functional_interface.dropout(x_new, p=self.dropout, training=self.training)
-
-            # Edge Updates (emlps)
-            src_nodes = curr_edge_index[0]
-            dst_nodes = curr_edge_index[1]
-            x_src = x[src_nodes]
-            x_dst = x[dst_nodes]
-
-            mlp_in = torch.cat([curr_edge_attr, x_src, x_dst], dim=-1)
-            new_edge_attr = edge_mlp(mlp_in)
-            curr_edge_attr = functional_interface.relu(new_edge_attr)
+            x, curr_attr = self._process_layer(i, x, curr_index, curr_attr)
 
         return typing.cast(torch.Tensor, x)
 
