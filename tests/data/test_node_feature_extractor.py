@@ -1,5 +1,6 @@
 """Unit tests for the NodeFeatureExtractor class."""
 
+import numpy as np
 import polars as pl
 import pytest
 import torch
@@ -102,3 +103,30 @@ class TestNodeFeatureExtractor:
         assert torch.allclose(fastrp_vals[0], torch.tensor([0.1] * 64))
         assert torch.allclose(fastrp_vals[1], torch.tensor([0.2] * 64))
         assert torch.allclose(fastrp_vals[2], torch.tensor([0.3] * 64))
+
+    def test_apply_log1p(self, extractor: NodeFeatureExtractor) -> None:
+        """Verifies that log1p transformation is correctly applied to financial columns."""
+        financial_cols: list[str] = [
+            "total_sent",
+            "avg_sent",
+            "max_sent",
+            "min_sent",
+            "total_received",
+            "avg_received",
+            "max_received",
+            "min_received",
+        ]
+        data: dict[str, list[float]] = {col: [0.0, 1.0, 10.0, 100.0] for col in financial_cols}
+        data["other_col"] = [1.0, 2.0, 3.0, 4.0]
+
+        dummy_df: pl.DataFrame = pl.DataFrame(data)
+        result_df: pl.DataFrame = extractor._apply_log1p(dummy_df)
+
+        for col in financial_cols:
+            expected: np.ndarray = np.log1p(np.array([0.0, 1.0, 10.0, 100.0]))
+            actual: np.ndarray = result_df[col].to_numpy()
+            assert np.allclose(actual, expected)
+
+        expected_other: np.ndarray = np.array([1.0, 2.0, 3.0, 4.0])
+        actual_other: np.ndarray = result_df["other_col"].to_numpy()
+        assert np.allclose(actual_other, expected_other)
