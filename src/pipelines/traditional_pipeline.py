@@ -8,6 +8,7 @@ import polars as pl
 
 from src.config.experiment_config import ExperimentConfig
 from src.data.preprocessor import DataPreprocessor
+from src.models.interfaces import ITraditionalModel
 from src.models.traditional import create_model
 from src.tracking.experiment_tracker import ExperimentTracker
 from src.utils.data_manager import DataSyncManager
@@ -37,27 +38,31 @@ class TraditionalPipeline:
 
     def _preprocess(self) -> dict[str, np.ndarray]:
         """Downloads and preprocesses the dataset exactly once."""
-        dataset_cfg = self.config.dataset
-        split_cfg = self.config.split
+        handle = self.config.dataset.handle
+        self.logger.info("Downloading dataset '%s'...", handle)
+        dataset_path = self.sync_manager.download_kaggle_dataset(handle)
+        encoded_frame = self._get_encoded_frame(dataset_path)
+        return self._split_and_format_data(encoded_frame)
 
-        self.logger.info("Downloading dataset '%s'...", dataset_cfg.handle)
-        dataset_path = self.sync_manager.download_kaggle_dataset(dataset_cfg.handle)
-
-        self.logger.info("Loading and cleaning data (prefix: %s)...", dataset_cfg.prefix)
-        raw_frame = self.preprocessor.load_data(dataset_path, dataset_prefix=dataset_cfg.prefix)
+    def _get_encoded_frame(self, dataset_path: str) -> pl.DataFrame:
+        """Loads, cleans, and encodes features from the dataset path."""
+        prefix = self.config.dataset.prefix
+        self.logger.info("Loading and cleaning data (prefix: %s)...", prefix)
+        raw_frame = self.preprocessor.load_data(dataset_path, dataset_prefix=prefix)
         clean_frame = self.preprocessor.clean_data(raw_frame)
-
         categorical_cols = self._detect_categorical_columns(clean_frame)
         self.logger.info("Encoding categorical features: %s", categorical_cols)
-        encoded_frame = self.preprocessor.encode_features(clean_frame, categorical_cols)
+        return self.preprocessor.encode_features(clean_frame, categorical_cols)
 
+    def _split_and_format_data(self, encoded_frame: pl.DataFrame) -> dict[str, np.ndarray]:
+        """Splits the encoded frame and returns a dictionary of dataset splits."""
+        split_cfg = self.config.split
         x_train, x_val, x_test, y_train, y_val, y_test = self.preprocessor.split_data(
             encoded_frame,
             target_col="Is Laundering",
             test_size=split_cfg.test_size,
             random_state=split_cfg.random_state,
         )
-
         self.logger.info(
             "Splits — Train: %d, Val: %d, Test: %d",
             x_train.shape[0],
@@ -89,34 +94,59 @@ class TraditionalPipeline:
     ) -> None:
         """Iterates over requested models: train, evaluate on val+test, log to MLflow."""
         for model_name in model_names:
-            self.logger.info("=== Running model: %s ===", model_name)
-            model_params = self.config.models.get(model_name, {})
-            model = create_model(model_name, **model_params)
+            self._run_model_lifecycle(model_name, splits, tracker)
 
-            tracker.start_run(run_name=model_name)
-            tracker.log_params(model_params)
+    def _run_model_lifecycle(
+        self,
+        model_name: str,
+        splits: dict[str, np.ndarray],
+        tracker: ExperimentTracker,
+    ) -> None:
+        """Trains, evaluates, and logs a single model's metrics and state."""
+        self.logger.info("=== Running model: %s ===", model_name)
+        model_params = self.config.models.get(model_name, {})
+        model = create_model(model_name, **model_params)
 
-            x_train = splits["x_train"]
-            y_train = splits["y_train"]
-            self.logger.info(
-                "Training %s on %d samples with %d features...",
-                model_name,
-                x_train.shape[0],
-                x_train.shape[1],
-            )
+        tracker.start_run(run_name=model_name)
+        tracker.log_params(model_params)
 
-            start_time = time.perf_counter()
-            model.train(x_train, y_train)
-            duration = time.perf_counter() - start_time
-            self.logger.info("Training of %s completed in %.2f seconds.", model_name, duration)
+        self._train_model(model, model_name, splits["x_train"], splits["y_train"])
+        self._evaluate_and_log(model, model_name, splits, tracker)
 
-            val_metrics = model.evaluate(splits["x_val"], splits["y_val"])
-            self.logger.info("Validation metrics for %s: %s", model_name, val_metrics)
-            tracker.log_metrics({f"val_{key}": value for key, value in val_metrics.items()})
+        tracker.log_model(model.get_underlying_model(), model_name=f"{model_name}_model")
+        tracker.end_run()
 
-            test_metrics = model.evaluate(splits["x_test"], splits["y_test"])
-            self.logger.info("Test metrics for %s: %s", model_name, test_metrics)
-            tracker.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
+    def _train_model(
+        self,
+        model: ITraditionalModel,
+        model_name: str,
+        x_train: np.ndarray,
+        y_train: np.ndarray,
+    ) -> None:
+        """Trains the model and logs the training duration."""
+        self.logger.info(
+            "Training %s on %d samples with %d features...",
+            model_name,
+            x_train.shape[0],
+            x_train.shape[1],
+        )
+        start_time = time.perf_counter()
+        model.train(x_train, y_train)
+        duration = time.perf_counter() - start_time
+        self.logger.info("Training of %s completed in %.2f seconds.", model_name, duration)
 
-            tracker.log_model(model.get_underlying_model(), model_name=f"{model_name}_model")
-            tracker.end_run()
+    def _evaluate_and_log(
+        self,
+        model: ITraditionalModel,
+        model_name: str,
+        splits: dict[str, np.ndarray],
+        tracker: ExperimentTracker,
+    ) -> None:
+        """Evaluates the model on validation/test sets and logs the metrics."""
+        val_metrics = model.evaluate(splits["x_val"], splits["y_val"])
+        self.logger.info("Validation metrics for %s: %s", model_name, val_metrics)
+        tracker.log_metrics({f"val_{key}": value for key, value in val_metrics.items()})
+
+        test_metrics = model.evaluate(splits["x_test"], splits["y_test"])
+        self.logger.info("Test metrics for %s: %s", model_name, test_metrics)
+        tracker.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
