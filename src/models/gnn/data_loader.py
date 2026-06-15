@@ -31,6 +31,34 @@ def build_weighted_sampler(labels: torch.Tensor) -> WeightedRandomSampler | None
     )
 
 
+def _create_link_loader(
+    data: Data,
+    num_neighbors: list[int],
+    batch_size: int,
+    sampler: WeightedRandomSampler | None,
+) -> LinkNeighborLoader:
+    """Constructs a LinkNeighborLoader using either a sampler or shuffling."""
+    if sampler is not None:
+        return LinkNeighborLoader(
+            data,
+            num_neighbors=num_neighbors,
+            edge_label_index=data.edge_index,
+            edge_label=data.y,
+            batch_size=batch_size,
+            sampler=sampler,
+            neg_sampling_ratio=0.0,
+        )
+    return LinkNeighborLoader(
+        data,
+        num_neighbors=num_neighbors,
+        edge_label_index=data.edge_index,
+        edge_label=data.y,
+        batch_size=batch_size,
+        shuffle=True,
+        neg_sampling_ratio=0.0,
+    )
+
+
 def get_train_loader(
     graph_data: Data, num_neighbors: list[int], batch_size: int
 ) -> LinkNeighborLoader:
@@ -47,25 +75,7 @@ def get_train_loader(
     )
 
     sampler = build_weighted_sampler(train_y)
-    if sampler is not None:
-        return LinkNeighborLoader(
-            train_data,
-            num_neighbors=num_neighbors,
-            edge_label_index=train_data.edge_index,
-            edge_label=train_data.y,
-            batch_size=batch_size,
-            sampler=sampler,
-            neg_sampling_ratio=0.0,
-        )
-    return LinkNeighborLoader(
-        train_data,
-        num_neighbors=num_neighbors,
-        edge_label_index=train_data.edge_index,
-        edge_label=train_data.y,
-        batch_size=batch_size,
-        shuffle=True,
-        neg_sampling_ratio=0.0,
-    )
+    return _create_link_loader(train_data, num_neighbors, batch_size, sampler)
 
 
 def get_val_loader(
