@@ -20,6 +20,15 @@ class GNNTrainingContext:
     device: torch.device
 
 
+@dataclass(frozen=True)
+class GNNCheckpointState:
+    """Holds the best checkpoint metrics and state dicts during training."""
+
+    best_pr_auc: float
+    best_enc_state: dict[str, torch.Tensor] | None
+    best_cls_state: dict[str, torch.Tensor] | None
+
+
 def inject_ego_ids(subgraph: Data) -> torch.Tensor:
     """Concatenates ego-ID flags to node features for seed edge endpoints."""
     num_nodes: int = subgraph.x.size(0)
