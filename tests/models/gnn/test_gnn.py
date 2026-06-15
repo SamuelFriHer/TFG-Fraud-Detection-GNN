@@ -182,3 +182,24 @@ def test_evaluate_predictions() -> None:
     threshold_metrics = evaluate_predictions_at_threshold(sample_probs, sample_y_true, 0.5)
     assert threshold_metrics["accuracy"] == 1.0
     assert threshold_metrics["f1"] == 1.0
+
+
+def test_gnn_config_in_channels() -> None:
+    """Verify that in_channels is correctly computed as node_feat_dim + 1."""
+    node_feat_dim: int = 10
+    edge_feat_dim: int = 5
+
+    # Test case 1: in_channels is not provided
+    config_default: GNNModelConfig = GNNModelConfig(
+        node_feat_dim=node_feat_dim,
+        edge_feat_dim=edge_feat_dim,
+    )
+    assert config_default.in_channels == node_feat_dim + 1
+
+    # Test case 2: in_channels is provided but incorrect
+    config_incorrect: GNNModelConfig = GNNModelConfig(
+        node_feat_dim=node_feat_dim,
+        edge_feat_dim=edge_feat_dim,
+        in_channels=20,
+    )
+    assert config_incorrect.in_channels == node_feat_dim + 1
