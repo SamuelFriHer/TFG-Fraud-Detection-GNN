@@ -27,8 +27,11 @@ class TestNeo4jFeatureExtractor:
             yield mock_gds, mock_driver
 
     @pytest.fixture
-    def extractor(self, mock_dependencies: tuple[MagicMock, MagicMock]) -> Neo4jFeatureExtractor:
+    def extractor(
+        self, mock_dependencies: tuple[MagicMock, MagicMock], monkeypatch: pytest.MonkeyPatch
+    ) -> Neo4jFeatureExtractor:
         """Provides a Neo4jFeatureExtractor instance with mocked dependencies."""
+        monkeypatch.setenv("NEO4J_PASSWORD", "test_password")
         extractor_instance: Neo4jFeatureExtractor = Neo4jFeatureExtractor()
         return extractor_instance
 

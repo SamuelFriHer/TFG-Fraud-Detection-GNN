@@ -20,7 +20,10 @@ class Neo4jFeatureExtractor:
         """Initializes the GDS client and standard driver."""
         self.uri: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.user: str = os.getenv("NEO4J_USER", "neo4j")
-        self.password: str = os.getenv("NEO4J_PASSWORD", "tfg_password")
+        password: str | None = os.getenv("NEO4J_PASSWORD")
+        if not password:
+            raise ValueError("NEO4J_PASSWORD environment variable is not set.")
+        self.password: str = password
 
         self.gds: GraphDataScience = GraphDataScience(self.uri, auth=(self.user, self.password))
         self.driver: Driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))

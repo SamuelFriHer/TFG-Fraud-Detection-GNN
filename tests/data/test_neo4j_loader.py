@@ -19,8 +19,9 @@ class TestNeo4jLoader:
         return driver
 
     @pytest.fixture
-    def loader(self, mock_driver: MagicMock) -> Neo4jLoader:
+    def loader(self, mock_driver: MagicMock, monkeypatch: pytest.MonkeyPatch) -> Neo4jLoader:
         """Provides a Neo4jLoader instance with a mocked driver."""
+        monkeypatch.setenv("NEO4J_PASSWORD", "test_password")
         with patch("src.data.neo4j_loader.GraphDatabase.driver", return_value=mock_driver):
             loader_instance: Neo4jLoader = Neo4jLoader()
             return loader_instance

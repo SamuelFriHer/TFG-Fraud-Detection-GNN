@@ -1,10 +1,11 @@
 """Module for loading accounts and transactions data into Neo4j."""
 
 import os
+from typing import Any
 
 import polars as pl
 from dotenv import load_dotenv
-from neo4j import GraphDatabase
+from neo4j import Driver, GraphDatabase
 
 from src.utils.logger import ProjectLogger
 
@@ -16,11 +17,14 @@ class Neo4jLoader:
 
     def __init__(self) -> None:
         """Initializes the Neo4j driver using environment variables."""
-        self.uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        self.user = os.getenv("NEO4J_USER", "neo4j")
-        self.password = os.getenv("NEO4J_PASSWORD", "tfg_password")
-        self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
-        self.logger = ProjectLogger.get_logger("Neo4jLoader")
+        self.uri: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        self.user: str = os.getenv("NEO4J_USER", "neo4j")
+        password: str | None = os.getenv("NEO4J_PASSWORD")
+        if not password:
+            raise ValueError("NEO4J_PASSWORD environment variable is not set.")
+        self.password: str = password
+        self.driver: Driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+        self.logger: Any = ProjectLogger.get_logger("Neo4jLoader")
 
         max_retries: int = 2 if "PYTEST_CURRENT_TEST" in os.environ else 30
         self._wait_for_connection(max_retries=max_retries)
