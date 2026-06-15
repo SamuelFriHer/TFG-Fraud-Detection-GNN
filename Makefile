@@ -4,7 +4,7 @@ install:
 	pip install --extra-index-url https://download.pytorch.org/whl/cu124 -f https://data.pyg.org/whl/torch-2.4.1+cu124.html -e ".[dev]"
 
 test:
-	pytest tests/ -v
+	pytest tests/
 
 lint:
 	ruff check .
