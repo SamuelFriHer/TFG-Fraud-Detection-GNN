@@ -1,5 +1,6 @@
 """Module responsible for building graphs from AML tabular data."""
 
+import logging
 from pathlib import Path
 
 import polars as pl
@@ -128,46 +129,56 @@ class AMLGraphBuilder:
 
         return train_mask, val_mask, test_mask
 
+    def _integrate_neo4j(
+        self, accounts_df: pl.DataFrame, trans_df: pl.DataFrame
+    ) -> pl.DataFrame | None:
+        """Runs the Neo4j integration pipeline and returns the extracted features."""
+        logger: logging.Logger = ProjectLogger.get_logger("AMLGraphBuilder")
+        try:
+            logger.info("Starting Neo4j integration pipeline...")
+            loader: Neo4jLoader = Neo4jLoader()
+            loader.run_pipeline(accounts_df, trans_df)
+
+            extractor: Neo4jFeatureExtractor = Neo4jFeatureExtractor()
+            neo4j_df: pl.DataFrame = extractor.run_pipeline()
+            logger.info("Neo4j integration pipeline finished successfully.")
+            return neo4j_df
+        except Exception as e:
+            logger.warning(f"Neo4j integration failed: {e}. Falling back to basic features.")
+            return None
+
+    def _create_graph_data(
+        self,
+        acc_df: pl.DataFrame,
+        tx_df: pl.DataFrame,
+        test_size: float,
+        neo_df: pl.DataFrame | None,
+    ) -> Data:
+        """Helper to create the PyTorch Geometric Data object."""
+        n_edges: int = len(tx_df)
+        train_cutoff: int = int(n_edges * (1.0 - test_size))
+        x: torch.Tensor = self.node_extractor.compute_features(acc_df, tx_df, train_cutoff, neo_df)
+        masks: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] = (
+            self._compute_edge_index_and_masks(tx_df, test_size)
+        )
+        edge_idx, tr_mask, val_mask, te_mask = masks
+        edge_attr: torch.Tensor = self.edge_extractor.extract_features(tx_df)
+        y: torch.Tensor = torch.tensor(tx_df["Is Laundering"].to_numpy(), dtype=torch.long)
+        return Data(
+            x=x,
+            edge_index=edge_idx,
+            edge_attr=edge_attr,
+            y=y,
+            train_mask=tr_mask,
+            val_mask=val_mask,
+            test_mask=te_mask,
+        )
+
     def build_graph(self, dataset_dir: str, prefix: str, test_size: float = 0.4) -> Data:
         """Builds and returns a PyTorch Geometric Data object."""
         accounts_df: pl.DataFrame
         trans_df: pl.DataFrame
         accounts_df, trans_df = self._load_data(dataset_dir, prefix)
         accounts_df, trans_df = self._prepare_accounts_and_transactions(accounts_df, trans_df)
-
-        logger = ProjectLogger.get_logger("AMLGraphBuilder")
-        try:
-            logger.info("Starting Neo4j integration pipeline...")
-            loader = Neo4jLoader()
-            loader.run_pipeline(accounts_df, trans_df)
-
-            extractor = Neo4jFeatureExtractor()
-            neo4j_df = extractor.run_pipeline()
-            logger.info("Neo4j integration pipeline finished successfully.")
-        except Exception as e:
-            logger.warning(f"Neo4j integration failed: {e}. Falling back to basic features.")
-            neo4j_df = None
-
-        n_edges: int = len(trans_df)
-        train_cutoff: int = int(n_edges * (1.0 - test_size))
-        x: torch.Tensor = self.node_extractor.compute_features(
-            accounts_df, trans_df, train_cutoff, neo4j_df
-        )
-        edge_index: torch.Tensor
-        train_mask: torch.Tensor
-        val_mask: torch.Tensor
-        test_mask: torch.Tensor
-        edge_index, train_mask, val_mask, test_mask = self._compute_edge_index_and_masks(
-            trans_df, test_size
-        )
-        edge_attr_scaled: torch.Tensor = self.edge_extractor.extract_features(trans_df)
-        y: torch.Tensor = torch.tensor(trans_df["Is Laundering"].to_numpy(), dtype=torch.long)
-        return Data(
-            x=x,
-            edge_index=edge_index,
-            edge_attr=edge_attr_scaled,
-            y=y,
-            train_mask=train_mask,
-            val_mask=val_mask,
-            test_mask=test_mask,
-        )
+        neo4j_df: pl.DataFrame | None = self._integrate_neo4j(accounts_df, trans_df)
+        return self._create_graph_data(accounts_df, trans_df, test_size, neo4j_df)
