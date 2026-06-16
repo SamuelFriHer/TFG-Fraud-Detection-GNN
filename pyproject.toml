@@ -22,8 +22,6 @@ dependencies = [
     # Graph manipulation
     "networkx>=3,<4",
     "torch==2.4.1",
-    "torchvision==0.19.1",
-    "torchaudio==2.4.1",
     "torch-geometric>=2.5,<3",
     "pyg_lib",
     "torch_scatter",
@@ -33,11 +31,9 @@ dependencies = [
 
     # Explainability (XAI)
     "shap>=0.45,<1",
-    "lime>=0.2,<1",
 
     # Visualization
     "matplotlib>=3.8,<4",
-    "seaborn>=0.13,<1",
 
     # Environment
     "python-dotenv>=1.2,<2",
@@ -48,7 +44,6 @@ dependencies = [
     # Cloud storage
     "huggingface_hub>=1.9,<2",
     "kagglehub==1.0.0",
-    "kagglesdk==0.1.21",
 ]
 
 [project.optional-dependencies]

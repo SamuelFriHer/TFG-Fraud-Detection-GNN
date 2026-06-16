@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu124"
 
 # Install PyTorch with CUDA 12 support
-RUN pip install --no-cache-dir torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1
+RUN pip install --no-cache-dir torch==2.4.1
 
 # Install PyTorch Geometric and optional dependencies
 RUN pip install --no-cache-dir torch_geometric \
