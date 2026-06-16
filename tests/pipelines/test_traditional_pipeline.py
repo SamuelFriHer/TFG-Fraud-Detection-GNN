@@ -57,6 +57,7 @@ class TestTraditionalPipeline:
             patch.object(pipeline, "_preprocess", return_value=mock_splits),
             patch("src.pipelines.traditional_pipeline.create_model", return_value=mock_model),
             patch("src.pipelines.traditional_pipeline.ExperimentTracker") as mock_tracker_cls,
+            patch.object(pipeline, "_explain_and_log"),
         ):
             mock_tracker = mock_tracker_cls.return_value
 
@@ -129,6 +130,7 @@ class TestTraditionalPipeline:
                 "src.pipelines.traditional_pipeline.create_model", return_value=mock_model
             ) as mock_create_model,
             patch("src.pipelines.traditional_pipeline.ExperimentTracker"),
+            patch.object(pipeline, "_explain_and_log"),
         ):
             pipeline._train_and_evaluate(requested_models, mock_splits, MagicMock())
 

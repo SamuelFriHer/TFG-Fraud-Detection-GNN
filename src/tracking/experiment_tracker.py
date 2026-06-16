@@ -46,6 +46,11 @@ class ExperimentTracker:
             mlflow.pyfunc.log_model(name=model_name, python_model=model)
         self.logger.info("Model artifact saved as '%s'", model_name)
 
+    def log_artifact(self, local_path: str, artifact_path: str | None = None) -> None:
+        """Logs a local file or directory as an artifact in MLflow."""
+        mlflow.log_artifact(local_path, artifact_path)
+        self.logger.info("Logged artifact from %s", local_path)
+
     def end_run(self) -> None:
         """Closes the active MLflow run."""
         mlflow.end_run()

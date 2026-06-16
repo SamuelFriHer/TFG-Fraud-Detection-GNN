@@ -95,12 +95,13 @@ class TestGNNPipeline:
         mock_model.evaluate.side_effect = lambda data, stage: (
             {"f1": 0.8} if stage == "val" else {"f1": 0.7}
         )
-        mock_model.get_underlying_model.return_value = "underlying_model"
+        mock_model.get_underlying_model.return_value = (MagicMock(), MagicMock())
 
         mock_data = MagicMock(spec=Data)
         mock_tracker = MagicMock()
 
-        pipeline._train_and_evaluate(mock_model, mock_data, mock_tracker)
+        with patch.object(pipeline, "_explain_and_log"):
+            pipeline._train_and_evaluate(mock_model, mock_data, mock_tracker)
 
         mock_model.train.assert_called_once_with(mock_data)
         mock_model.evaluate.assert_any_call(mock_data, stage="val")
@@ -108,7 +109,7 @@ class TestGNNPipeline:
         mock_tracker.log_metrics.assert_any_call({"val_f1": 0.8})
         mock_tracker.log_metrics.assert_any_call({"test_f1": 0.7})
         mock_tracker.log_model.assert_called_once_with(
-            "underlying_model", model_name="MEGA_PNA_model"
+            mock_model.get_underlying_model.return_value, model_name="MEGA_PNA_model"
         )
 
     def test_run(self, pipeline: GNNPipeline) -> None:

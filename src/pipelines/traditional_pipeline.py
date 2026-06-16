@@ -2,12 +2,15 @@
 
 import logging
 import time
+import typing
 
 import numpy as np
 import polars as pl
 
 from src.config.experiment_config import ExperimentConfig
 from src.data.preprocessor import DataPreprocessor
+from src.explainability.traditional_explainer import ShapExplainer
+from src.explainability.visualizers import TraditionalVisualizer
 from src.models.interfaces import ITraditionalModel
 from src.models.traditional import create_model
 from src.tracking.experiment_tracker import ExperimentTracker
@@ -36,7 +39,7 @@ class TraditionalPipeline:
 
         self.logger.info("Pipeline completed for %d model(s).", len(requested_models))
 
-    def _preprocess(self) -> dict[str, np.ndarray]:
+    def _preprocess(self) -> dict[str, typing.Any]:
         """Downloads and preprocesses the dataset exactly once."""
         handle = self.config.dataset.handle
         self.logger.info("Downloading dataset '%s'...", handle)
@@ -54,7 +57,7 @@ class TraditionalPipeline:
         self.logger.info("Encoding categorical features: %s", categorical_cols)
         return self.preprocessor.encode_features(clean_frame, categorical_cols)
 
-    def _split_and_format_data(self, encoded_frame: pl.DataFrame) -> dict[str, np.ndarray]:
+    def _split_and_format_data(self, encoded_frame: pl.DataFrame) -> dict[str, typing.Any]:
         """Splits the encoded frame and returns a dictionary of dataset splits."""
         split_cfg = self.config.split
         x_train, x_val, x_test, y_train, y_val, y_test = self.preprocessor.split_data(
@@ -69,6 +72,7 @@ class TraditionalPipeline:
             x_val.shape[0],
             x_test.shape[0],
         )
+        feature_names = [c for c in encoded_frame.columns if c != "Is Laundering"]
         return {
             "x_train": x_train,
             "x_val": x_val,
@@ -76,6 +80,7 @@ class TraditionalPipeline:
             "y_train": y_train,
             "y_val": y_val,
             "y_test": y_test,
+            "feature_names": feature_names,
         }
 
     @staticmethod
@@ -89,7 +94,7 @@ class TraditionalPipeline:
     def _train_and_evaluate(
         self,
         model_names: list[str],
-        splits: dict[str, np.ndarray],
+        splits: dict[str, typing.Any],
         tracker: ExperimentTracker,
     ) -> None:
         """Iterates over requested models: train, evaluate on val+test, log to MLflow."""
@@ -99,7 +104,7 @@ class TraditionalPipeline:
     def _run_model_lifecycle(
         self,
         model_name: str,
-        splits: dict[str, np.ndarray],
+        splits: dict[str, typing.Any],
         tracker: ExperimentTracker,
     ) -> None:
         """Trains, evaluates, and logs a single model's metrics and state."""
@@ -112,6 +117,7 @@ class TraditionalPipeline:
 
         self._train_model(model, model_name, splits["x_train"], splits["y_train"])
         self._evaluate_and_log(model, model_name, splits, tracker)
+        self._explain_and_log(model, model_name, splits, tracker)
 
         tracker.log_model(model.get_underlying_model(), model_name=f"{model_name}_model")
         tracker.end_run()
@@ -139,7 +145,7 @@ class TraditionalPipeline:
         self,
         model: ITraditionalModel,
         model_name: str,
-        splits: dict[str, np.ndarray],
+        splits: dict[str, typing.Any],
         tracker: ExperimentTracker,
     ) -> None:
         """Evaluates the model on validation/test sets and logs the metrics."""
@@ -150,3 +156,29 @@ class TraditionalPipeline:
         test_metrics = model.evaluate(splits["x_test"], splits["y_test"])
         self.logger.info("Test metrics for %s: %s", model_name, test_metrics)
         tracker.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
+
+    def _explain_and_log(
+        self,
+        model: ITraditionalModel,
+        model_name: str,
+        splits: dict[str, typing.Any],
+        tracker: ExperimentTracker,
+    ) -> None:
+        """Explains the model and logs visualizations."""
+        from src.utils.paths import PROJECT_ROOT
+
+        self.logger.info("Generating SHAP explanations for %s...", model_name)
+        explainer = ShapExplainer(model, splits["x_train"])
+        explanation = explainer.explain_instances(splits["x_test"], splits["feature_names"])
+
+        output_dir = PROJECT_ROOT / "outputs" / "explainability" / model_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        summary_path = str(output_dir / "shap_summary.png")
+        bar_path = str(output_dir / "shap_bar.png")
+
+        TraditionalVisualizer.save_summary_plot(explanation, summary_path)
+        TraditionalVisualizer.save_bar_plot(explanation, bar_path)
+
+        tracker.log_artifact(summary_path, f"explainability/{model_name}")
+        tracker.log_artifact(bar_path, f"explainability/{model_name}")

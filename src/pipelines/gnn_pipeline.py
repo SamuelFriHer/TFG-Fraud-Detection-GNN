@@ -5,6 +5,8 @@ import tomllib
 from torch_geometric.data import Data
 
 from src.data.graph_builder import AMLGraphBuilder
+from src.explainability.gnn_explainer import GnnExplainerModel
+from src.explainability.visualizers import GnnVisualizer
 from src.models.gnn.config import GNNModelConfig
 from src.models.gnn.model import GNNFraudDetector
 from src.tracking.experiment_tracker import ExperimentTracker
@@ -82,7 +84,38 @@ class GNNPipeline:
             tracker.log_metrics({f"{stage}_{key}": value for key, value in metrics.items()})
 
         tracker.log_model(model.get_underlying_model(), model_name="MEGA_PNA_model")
+
+        self._explain_and_log(model, data, tracker)
+
         tracker.end_run()
+
+    def _explain_and_log(
+        self,
+        model: GNNFraudDetector,
+        data: Data,
+        tracker: ExperimentTracker,
+    ) -> None:
+        """Explains a subset of predictions and logs visualizations."""
+        from src.utils.paths import PROJECT_ROOT
+
+        self.logger.info("Generating GNN explanations...")
+        explainer = GnnExplainerModel(model)
+
+        target_edge_idx = 0
+        if hasattr(data, "y") and data.y is not None:
+            pos_edges = (data.y == 1).nonzero(as_tuple=True)[0]
+            if len(pos_edges) > 0:
+                target_edge_idx = int(pos_edges[0].item())
+
+        explanation = explainer.explain_graph(data, index=target_edge_idx)
+
+        output_dir = PROJECT_ROOT / "outputs" / "explainability" / "gnn"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        subgraph_path = str(output_dir / f"gnn_subgraph_edge_{target_edge_idx}.png")
+
+        GnnVisualizer.save_subgraph_plot(explanation, data, subgraph_path)
+        tracker.log_artifact(subgraph_path, "explainability/gnn")
 
     def run(self) -> None:
         """Runs the complete GNN training and evaluation pipeline."""
