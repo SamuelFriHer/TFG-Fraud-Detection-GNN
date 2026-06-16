@@ -165,6 +165,12 @@ class TraditionalPipeline:
         tracker: ExperimentTracker,
     ) -> None:
         """Explains the model and logs visualizations."""
+        if model_name not in ["XGBoost", "LightGBM"]:
+            self.logger.info(
+                "Skipping explainability for %s (computationally expensive).", model_name
+            )
+            return
+
         from src.utils.paths import PROJECT_ROOT
 
         self.logger.info("Generating SHAP explanations for %s...", model_name)
