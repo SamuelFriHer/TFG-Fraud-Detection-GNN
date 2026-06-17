@@ -1,4 +1,4 @@
-"""Pipeline para ejecutar Grid Search automático de hiperparámetros de GNN."""
+"""Pipeline to run automatic Grid Search for GNN hyperparameters."""
 
 import gc
 import itertools
@@ -17,14 +17,14 @@ from src.utils.logger import ProjectLogger
 
 
 class GNNGridSearchPipeline:
-    """Ejecuta una búsqueda de hiperparámetros para modelos GNN.
+    """Executes a hyperparameter search for GNN models.
 
-    Construye el grafo una sola vez y lo reutiliza para múltiples entrenamientos
-    basados en un grid de hiperparámetros predefinido, registrando todo en MLflow.
+    Builds the graph once and reuses it for multiple training runs
+    based on a predefined hyperparameter grid, logging everything to MLflow.
     """
 
     def __init__(self, config_path: str) -> None:
-        """Inicializa leyendo la configuración base."""
+        """Initializes by reading the base configuration."""
         self.logger = ProjectLogger.get_logger("GNNGridSearch")
         with open(config_path, "rb") as f:
             self.config = tomllib.load(f)
@@ -33,24 +33,24 @@ class GNNGridSearchPipeline:
         self.prefix = self.config["dataset"]["prefix"]
 
     def _load_graph(self) -> Data:
-        """Carga y construye el grafo una única vez."""
+        """Loads and builds the graph once."""
         self.logger.info(
-            "Verificando dataset %s para Grid Search", self.config["dataset"]["handle"]
+            "Verifying dataset %s for Grid Search", self.config["dataset"]["handle"]
         )
         dataset_dir = self.sync_manager.download_kaggle_dataset(self.config["dataset"]["handle"])
 
-        self.logger.info("Construyendo grafo en memoria para %s", self.prefix)
+        self.logger.info("Building graph in memory for %s", self.prefix)
         builder = AMLGraphBuilder()
         test_size = float(self.config.get("split", {}).get("test_size", 0.4))
         graph = builder.build_graph(dataset_dir, self.prefix, test_size=test_size)
 
         self.logger.info(
-            "Grafo construido. Nodos: %d, Aristas: %d", graph.num_nodes, graph.num_edges
+            "Graph built. Nodes: %d, Edges: %d", graph.num_nodes, graph.num_edges
         )
         return graph
 
     def _generate_grid_combinations(self) -> tuple[list[str], list[tuple[Any, ...]]]:
-        """Genera el espacio de búsqueda e itertools.product de combinaciones."""
+        """Generates the search space and itertools.product combinations."""
         grid = {
             "pos_weight": [3.0, 5.0, 7.0, 10.0, 12.0],
             "num_neighbors": [[10, 5], [20, 10], [30, 15]],
@@ -65,7 +65,7 @@ class GNNGridSearchPipeline:
         params: dict[str, Any],
         graph: Data,
     ) -> GNNModelConfig:
-        """Crea la configuración del modelo a partir de hyperparámetros fijos y variables."""
+        """Creates the model configuration from fixed and variable hyperparameters."""
         base_gnn_config = self.config.get("models", {}).get("MEGA_PNA", {})
         full_params = base_gnn_config.copy()
         full_params.update(params)
@@ -91,21 +91,21 @@ class GNNGridSearchPipeline:
         graph: Data,
         tracker: ExperimentTracker,
     ) -> None:
-        """Ejecuta el entrenamiento y evaluación del modelo, registrando métricas y modelo."""
+        """Executes training and evaluation, logging metrics and model."""
         model.train(graph)
 
-        # Evaluar
+        # Evaluate
         val_metrics = model.evaluate(graph, stage="val")
         tracker.log_metrics({f"val_{k}": v for k, v in val_metrics.items()})
 
         test_metrics = model.evaluate(graph, stage="test")
         tracker.log_metrics({f"test_{k}": v for k, v in test_metrics.items()})
 
-        # Guardar el modelo para este run
+        # Save the model for this run
         tracker.log_model(model.get_underlying_model(), model_name="model")
 
     def _cleanup_memory(self, model: GNNFraudDetector) -> None:
-        """Libera la memoria ocupada por el modelo para evitar fugas."""
+        """Frees memory occupied by the model to prevent leaks."""
         del model
         gc.collect()
         if torch.cuda.is_available():
@@ -119,13 +119,13 @@ class GNNGridSearchPipeline:
         graph: Data,
         tracker: ExperimentTracker,
     ) -> None:
-        """Ejecuta una iteración individual del grid search."""
+        """Executes a single iteration of the grid search."""
         run_name = f"MEGA_PNA_Grid_{idx:03d}"
-        self.logger.info("--- [Run %d/%d] Parámetros: %s ---", idx, total_runs, params)
+        self.logger.info("--- [Run %d/%d] Parameters: %s ---", idx, total_runs, params)
 
         tracker.start_run(run_name=run_name)
 
-        # Registrar hyperparámetros fijos y variables
+        # Log fixed and variable hyperparameters
         base_gnn_config = self.config.get("models", {}).get("MEGA_PNA", {})
         full_params = base_gnn_config.copy()
         full_params.update(params)
@@ -136,14 +136,14 @@ class GNNGridSearchPipeline:
             model = GNNFraudDetector(graph_data=graph, config=model_config)
             self._train_and_evaluate(model, graph, tracker)
         except Exception as error_exception:
-            self.logger.error("Error en run %d: %s", idx, str(error_exception))
+            self.logger.error("Error in run %d: %s", idx, str(error_exception))
         finally:
             tracker.end_run()
             if "model" in locals():
                 self._cleanup_memory(locals()["model"])
 
     def run(self) -> None:
-        """Lanza la búsqueda grid, registrando cada iteración como un run."""
+        """Launches the grid search, logging each iteration as a run."""
         experiment_name = f"gnn_grid_{self.prefix}"
         tracker = ExperimentTracker(experiment_name)
 
@@ -151,7 +151,7 @@ class GNNGridSearchPipeline:
         keys, combinations = self._generate_grid_combinations()
         total_runs = len(combinations)
 
-        self.logger.info("Iniciando Grid Search con %d combinaciones", total_runs)
+        self.logger.info("Starting Grid Search with %d combinations", total_runs)
 
         for idx, combo in enumerate(combinations, start=1):
             params = dict(zip(keys, combo))
@@ -163,6 +163,6 @@ class GNNGridSearchPipeline:
                 tracker=tracker,
             )
 
-        self.logger.info("Grid search finalizado. Subiendo resultados al hub...")
+        self.logger.info("Grid search completed. Uploading results to the hub...")
         tracker.upload_results_to_hub()
-        self.logger.info("Proceso completado exitosamente.")
+        self.logger.info("Process completed successfully.")

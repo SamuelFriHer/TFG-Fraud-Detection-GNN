@@ -1,4 +1,4 @@
-"""Definición de las capas y arquitecturas de red neuronal de grafos (GNN) tipo MEGA-PNA."""
+"""Definition of MEGA-PNA graph neural network (GNN) layers and architectures."""
 
 import typing
 
@@ -12,10 +12,10 @@ from src.models.gnn.config import GNNModelConfig
 
 
 class MEGAPNAEncoder(nn.Module):
-    """Codificador de nodos basado en MEGA-PNA.
+    """Node encoder based on MEGA-PNA.
 
-    Implementa agregación en dos etapas (Multi-Edge y Neighborhood),
-    paso de mensajes inverso (reverse_mp) y actualización de aristas (emlps).
+    Implements two-stage aggregation (Multi-Edge and Neighborhood),
+    reverse message passing (reverse_mp), and edge updates (emlps).
     """
 
     def __init__(
@@ -23,7 +23,7 @@ class MEGAPNAEncoder(nn.Module):
         config: GNNModelConfig,
         deg: torch.Tensor,
     ) -> None:
-        """Inicializa las capas MEGA-PNA."""
+        """Initializes the MEGA-PNA layers."""
         super().__init__()
         self.num_layers = config.num_layers
         self.dropout = config.dropout
@@ -34,7 +34,7 @@ class MEGAPNAEncoder(nn.Module):
         self._build_layers(config, deg)
 
     def _build_layers(self, config: GNNModelConfig, deg: torch.Tensor) -> None:
-        """Construye las capas convolucionales y MLPs de aristas."""
+        """Builds convolutional layers and edge MLPs."""
         current_in_channels = config.hidden_channels
         current_edge_dim = self.processed_edge_dim
         for _ in range(config.num_layers):
@@ -62,7 +62,7 @@ class MEGAPNAEncoder(nn.Module):
     def _flatten_edges(
         self, edge_index: torch.Tensor, edge_attr: torch.Tensor, num_nodes: int
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Agregación de aristas múltiples (Multi-Edge Aggregation)."""
+        """Multi-Edge Aggregation."""
         edge_idx_1d = edge_index[0] * num_nodes + edge_index[1]
         unique_edge_idx_1d, inverse_indices = torch.unique(edge_idx_1d, return_inverse=True)
 
@@ -70,7 +70,7 @@ class MEGAPNAEncoder(nn.Module):
         max_attr = scatter(edge_attr, inverse_indices, dim=0, reduce="max")
         min_attr = scatter(edge_attr, inverse_indices, dim=0, reduce="min")
 
-        # Varianza y std
+        # Variance and std
         mean_sq = scatter(edge_attr**2, inverse_indices, dim=0, reduce="mean")
         var_attr = mean_sq - (mean_attr**2)
         std_attr = torch.sqrt(torch.clamp(var_attr, min=1e-6))
@@ -86,7 +86,7 @@ class MEGAPNAEncoder(nn.Module):
     def _reverse_mp(
         self, edge_index: torch.Tensor, edge_attr: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Inyección de aristas inversas para paso de mensajes bidireccional."""
+        """Injects reverse edges for bidirectional message passing."""
         num_edges: int = edge_index.size(1)
 
         fwd_flags: torch.Tensor = edge_attr.new_ones((num_edges, 1))
@@ -148,12 +148,12 @@ class MEGAPNAEncoder(nn.Module):
 
 
 class EdgeClassifier(nn.Module):
-    """Clasificador de aristas (transacciones) usando embeddings de nodos y atributos."""
+    """Edge (transaction) classifier using node embeddings and edge attributes."""
 
     def __init__(
         self, node_emb_dim: int, edge_attr_dim: int, hidden_dim: int, final_dropout: float = 0.1
     ) -> None:
-        """Inicializa el MLP de clasificación."""
+        """Initializes the classification MLP."""
         super().__init__()
         in_dim = (node_emb_dim * 2) + edge_attr_dim
 
@@ -170,7 +170,7 @@ class EdgeClassifier(nn.Module):
     def forward(
         self, z: torch.Tensor, edge_label_index: torch.Tensor, edge_attr: torch.Tensor
     ) -> torch.Tensor:
-        """Predice la probabilidad (logits) de fraude para las aristas dadas."""
+        """Predicts the probability (logits) of fraud for the given edges."""
         src_nodes = edge_label_index[0]
         dst_nodes = edge_label_index[1]
 

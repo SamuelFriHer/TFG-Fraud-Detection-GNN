@@ -28,14 +28,14 @@ class GNNPipeline:
 
     def _build_graph(self) -> Data:
         """Downloads the dataset and builds the graph representation."""
-        self.logger.info("Descargando/Verificando dataset %s...", self.config["dataset"]["handle"])
+        self.logger.info("Downloading/Verifying dataset %s...", self.config["dataset"]["handle"])
         dataset_dir = self.sync_manager.download_kaggle_dataset(self.config["dataset"]["handle"])
 
-        self.logger.info("Iniciando construcción del grafo para %s", self.prefix)
+        self.logger.info("Starting graph construction for %s", self.prefix)
         builder = AMLGraphBuilder()
         test_size = float(self.config.get("split", {}).get("test_size", 0.4))
         data = builder.build_graph(dataset_dir, self.prefix, test_size=test_size)
-        self.logger.info("Grafo construido: %s", data)
+        self.logger.info("Graph built: %s", data)
         return data
 
     def _create_model(self, data: Data) -> GNNFraudDetector:
@@ -44,7 +44,7 @@ class GNNPipeline:
         edge_dim: int = data.edge_attr.size(1)
         gnn_config: dict = self.config["models"]["MEGA_PNA"]
 
-        self.logger.info("Instanciando GNNFraudDetector (MEGA-PNA)")
+        self.logger.info("Instantiating GNNFraudDetector (MEGA-PNA)")
         model_config = GNNModelConfig(
             node_feat_dim=node_dim,
             edge_feat_dim=edge_dim,
@@ -75,11 +75,11 @@ class GNNPipeline:
         tracker.start_run(run_name="MEGA_PNA")
         tracker.log_params(gnn_config)
 
-        self.logger.info("Entrenando el modelo...")
+        self.logger.info("Training the model...")
         model.train(data)
 
         for stage in ["val", "test"]:
-            self.logger.info("Evaluando sobre el split de %s...", stage)
+            self.logger.info("Evaluating on %s split...", stage)
             metrics = model.evaluate(data, stage=stage)
             tracker.log_metrics({f"{stage}_{key}": value for key, value in metrics.items()})
 
@@ -127,6 +127,6 @@ class GNNPipeline:
 
         self._train_and_evaluate(model, data, tracker)
 
-        self.logger.info("Subiendo resultados al hub...")
+        self.logger.info("Uploading results to the hub...")
         tracker.upload_results_to_hub()
-        self.logger.info("Pipeline de GNN completado.")
+        self.logger.info("GNN pipeline completed.")

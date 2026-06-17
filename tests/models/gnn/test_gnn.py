@@ -1,4 +1,4 @@
-"""Tests unitarios para la arquitectura GNN y la construcción de grafos."""
+"""Unit tests for the GNN architecture and graph construction."""
 
 import polars as pl
 import pytest
@@ -12,7 +12,7 @@ from src.models.interfaces import IGraphModel
 
 @pytest.fixture
 def mock_graph_data() -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Crea DataFrames sintéticos de cuentas y transacciones."""
+    """Creates synthetic DataFrames for accounts and transactions."""
     accounts = pl.DataFrame(
         {
             "Bank Name": ["BankA", "BankA", "BankB"],
@@ -48,7 +48,7 @@ def test_gnn_interface() -> None:
 
 
 def test_gnn_forward_pass() -> None:
-    """Prueba que el modelo GNN realiza una pasada hacia adelante sin errores de dimensiones."""
+    """Tests that the GNN model performs a forward pass without dimension errors."""
     num_nodes = 5
     node_feat_dim = 10
     edge_feat_dim = 3
@@ -98,7 +98,7 @@ def test_gnn_forward_pass() -> None:
 
 
 def test_weighted_bce_loss() -> None:
-    """Valida que Weighted BCE Loss calcula pérdidas coherentes sin errores."""
+    """Validates that Weighted BCE Loss computes coherent losses without errors."""
     from src.models.gnn.loss import build_weighted_bce_loss
 
     inputs = torch.tensor([0.5, -0.5, 2.0, -2.0])
@@ -112,7 +112,7 @@ def test_weighted_bce_loss() -> None:
 
 
 def test_gnn_weighted_sampler() -> None:
-    """Verifica que el dataloader de entrenamiento use WeightedRandomSampler."""
+    """Verifies that the training dataloader uses WeightedRandomSampler."""
     num_nodes = 5
     node_feat_dim = 10
     edge_feat_dim = 3
