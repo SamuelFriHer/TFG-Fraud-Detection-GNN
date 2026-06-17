@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tfg-fraud-detection-gnn"
-version = "0.1.0"
+version = "1.0.0"
 description = "GNN vs Traditional ML for Anti-Money Laundering fraud detection."
 requires-python = ">=3.11"
-license = { text = "GPL-3.0-only" }
+license = { text = "CC-BY-NC-SA-4.0" }
 
 dependencies = [
     # Data processing
