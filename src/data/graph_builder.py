@@ -21,13 +21,7 @@ class AMLGraphBuilder:
         """Initializes the graph builder with the necessary mappings."""
         self.node_extractor = NodeFeatureExtractor()
         self.edge_extractor = EdgeFeatureExtractor()
-        self.node_encoders: dict[str, list[str]] = {}
         self.account_id_map: dict[str, int] = {}
-
-    @property
-    def edge_encoders(self) -> dict[str, list[str]]:
-        """Exposes the edge encoders from the edge extractor."""
-        return self.edge_extractor.edge_encoders
 
     def _find_csv(self, directory: str, prefix: str, suffix: str) -> Path:
         """Searches for a CSV file with a specific prefix and suffix."""
