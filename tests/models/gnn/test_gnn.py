@@ -233,3 +233,45 @@ def test_train_gnn_epoch_empty_loader() -> None:
 
     epoch_loss: float = train_gnn_epoch(training_context)
     assert epoch_loss == 0.0
+
+
+def test_gnn_explainer() -> None:
+    """Verifies that GNNExplainer computes explanations without dimension mismatches."""
+    from src.explainability.gnn_explainer import GnnExplainerModel
+
+    num_nodes, node_feat_dim, edge_feat_dim = 5, 10, 3
+    x = torch.rand((num_nodes, node_feat_dim))
+    edge_index = torch.tensor([[0, 1, 2, 3, 0], [1, 2, 3, 4, 2]], dtype=torch.long)
+    edge_attr = torch.rand((5, edge_feat_dim))
+    y = torch.tensor([0, 1, 0, 1, 0], dtype=torch.long)
+    train_mask = torch.tensor([True, True, False, False, False])
+    val_mask = torch.tensor([False, False, True, True, False])
+    test_mask = torch.tensor([False, False, False, False, True])
+
+    data = Data(
+        x=x,
+        edge_index=edge_index,
+        edge_attr=edge_attr,
+        y=y,
+        train_mask=train_mask,
+        val_mask=val_mask,
+        test_mask=test_mask,
+    )
+    config = GNNModelConfig(
+        node_feat_dim=node_feat_dim,
+        edge_feat_dim=edge_feat_dim,
+        hidden_channels=8,
+        num_layers=2,
+        batch_size=2,
+        epochs=1,
+    )
+    model = GNNFraudDetector(graph_data=data, config=config)
+    model.device = torch.device("cpu")
+    model.encoder.to("cpu")
+    model.classifier.to("cpu")
+
+    explainer = GnnExplainerModel(model)
+    explanation = explainer.explain_graph(data, index=0)
+
+    assert explanation.node_mask is not None
+    assert explanation.edge_mask is not None
