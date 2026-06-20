@@ -125,6 +125,19 @@ def test_experiment_tracker_log_model_fallback(mock_mlflow: MagicMock) -> None:
     )
 
 
+def test_experiment_tracker_log_model_no_predict(mock_mlflow: MagicMock) -> None:
+    """Verifies log_model delegates directly to pyfunc if model lacks 'predict'."""
+    tracker: ExperimentTracker = ExperimentTracker(experiment_name="test_experiment")
+    mock_model: MagicMock = MagicMock(spec=[])
+
+    tracker.log_model(mock_model, model_name="other_model")
+
+    mock_mlflow.sklearn.log_model.assert_not_called()
+    mock_mlflow.pyfunc.log_model.assert_called_once_with(
+        name="other_model", python_model=mock_model
+    )
+
+
 def test_upload_results_to_hub_with_arg(
     mock_mlflow: MagicMock,
     mock_paths: dict[str, MagicMock],

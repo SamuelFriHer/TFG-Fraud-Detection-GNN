@@ -40,9 +40,12 @@ class ExperimentTracker:
 
     def log_model(self, model: object, model_name: str) -> None:
         """Persists the trained model, supporting both sklearn and cuML backends."""
-        try:
-            mlflow.sklearn.log_model(model, name=model_name)
-        except TypeError:
+        if hasattr(model, "predict"):
+            try:
+                mlflow.sklearn.log_model(model, name=model_name)
+            except TypeError:
+                mlflow.pyfunc.log_model(name=model_name, python_model=model)
+        else:
             mlflow.pyfunc.log_model(name=model_name, python_model=model)
         self.logger.info("Model artifact saved as '%s'", model_name)
 

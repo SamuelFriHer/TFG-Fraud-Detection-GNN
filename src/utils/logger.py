@@ -71,6 +71,9 @@ class ProjectLogger:
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
 
+        # Silence third-party warnings to avoid them showing up as ERRORs in the log files
+        logging.getLogger("mlflow").setLevel(logging.ERROR)
+
     def _redirect_std_streams(self) -> None:
         """Redirects stdout and stderr to the configured logger."""
         sys.stdout = StreamToLogger(self.logger, logging.INFO)
