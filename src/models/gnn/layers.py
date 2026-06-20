@@ -1,5 +1,7 @@
 """Definition of MEGA-PNA graph neural network (GNN) layers and architectures."""
 
+from __future__ import annotations
+
 import typing
 
 import torch
@@ -71,26 +73,18 @@ class MEGAPNAEncoder(nn.Module):
         def custom_explain_message(
             conv_self: MessagePassing, inputs: torch.Tensor, dim_size: int | None
         ) -> torch.Tensor:
-            edge_mask: torch.Tensor | None = getattr(conv_self, "_edge_mask", None)
-            if edge_mask is None:
+            if (edge_mask := getattr(conv_self, "_edge_mask", None)) is None:
                 raise ValueError("Could not find a pre-defined 'edge_mask' to explain.")
-
             if getattr(conv_self, "_apply_sigmoid", True):
                 edge_mask = edge_mask.sigmoid()
-
-            inverse_indices: torch.Tensor | None = self.current_inverse_indices
-            if inverse_indices is None:
+            if (inv_idx := self.current_inverse_indices) is None:
                 raise ValueError("current_inverse_indices is not set in MEGAPNAEncoder.")
-
-            flat_edge_mask: torch.Tensor = scatter(edge_mask, inverse_indices, dim=0, reduce="mean")
-            mapped_mask: torch.Tensor = torch.cat([flat_edge_mask, flat_edge_mask], dim=0)
-
+            flat_mask: torch.Tensor = scatter(edge_mask, inv_idx, dim=0, reduce="mean")
+            mapped_mask: torch.Tensor = torch.cat([flat_mask, flat_mask], dim=0)
             node_dim: int = conv_self.node_dim
-            assert inputs.size(node_dim) == mapped_mask.size(0), (
-                f"Dimension mismatch: inputs.size({node_dim})={inputs.size(node_dim)}, "
-                f"mapped_mask.size(0)={mapped_mask.size(0)}"
-            )
-
+            if inputs.size(node_dim) != mapped_mask.size(0):
+                msg = f"Dim mismatch: {inputs.size(node_dim)} vs {mapped_mask.size(0)}"
+                raise AssertionError(msg)
             size: list[int] = [1] * inputs.dim()
             size[node_dim] = -1
             return inputs * mapped_mask.view(size)
