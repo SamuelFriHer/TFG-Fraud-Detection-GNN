@@ -59,32 +59,34 @@ class GnnVisualizer:
             return None
 
         edge_mask = explanation.edge_mask.numpy()
-        top_indices = edge_mask.argsort()[-top_k_edges:][::-1]
+        top_indices = edge_mask.argsort()[-top_k_edges:][::-1].copy()
 
         edge_index = graph_data.edge_index[:, top_indices]
         edge_weights = edge_mask[top_indices]
 
-        g = nx.Graph()
+        explanation_graph = nx.Graph()
         src_nodes = edge_index[0].numpy()
         dst_nodes = edge_index[1].numpy()
 
         for i in range(len(src_nodes)):
-            g.add_edge(src_nodes[i], dst_nodes[i], weight=edge_weights[i])
+            explanation_graph.add_edge(src_nodes[i], dst_nodes[i], weight=edge_weights[i])
 
-        return g
+        return explanation_graph
 
     @staticmethod
-    def _draw_and_save_graph(g: nx.Graph, output_path: str, top_k_edges: int) -> None:
+    def _draw_and_save_graph(
+        explanation_graph: nx.Graph, output_path: str, top_k_edges: int
+    ) -> None:
         """Draws and saves the NetworkX graph to a file."""
         plt.figure(figsize=(10, 10))
-        pos = nx.spring_layout(g)
+        pos = nx.spring_layout(explanation_graph)
 
-        nx.draw_networkx_nodes(g, pos, node_size=300, node_color="lightblue")
+        nx.draw_networkx_nodes(explanation_graph, pos, node_size=300, node_color="lightblue")
 
-        edges = g.edges(data=True)
+        edges = explanation_graph.edges(data=True)
         weights = [d["weight"] * 5.0 for u, v, d in edges]  # Scale width
-        nx.draw_networkx_edges(g, pos, width=weights, edge_color="gray", alpha=0.7)
-        nx.draw_networkx_labels(g, pos, font_size=10)
+        nx.draw_networkx_edges(explanation_graph, pos, width=weights, edge_color="gray", alpha=0.7)
+        nx.draw_networkx_labels(explanation_graph, pos, font_size=10)
 
         plt.title(f"GNN Explanation Subgraph (Top {top_k_edges} edges)")
         plt.axis("off")
@@ -101,10 +103,12 @@ class GnnVisualizer:
         top_k_edges: int = 20,
     ) -> None:
         """Saves a plot of the most important edges from the GNN explanation."""
-        g = GnnVisualizer._create_explanation_graph(explanation, graph_data, top_k_edges)
+        explanation_graph = GnnVisualizer._create_explanation_graph(
+            explanation, graph_data, top_k_edges
+        )
 
-        if g is None:
+        if explanation_graph is None:
             logger.warning("No edge mask found in explanation. Cannot plot subgraph.")
             return
 
-        GnnVisualizer._draw_and_save_graph(g, output_path, top_k_edges)
+        GnnVisualizer._draw_and_save_graph(explanation_graph, output_path, top_k_edges)
