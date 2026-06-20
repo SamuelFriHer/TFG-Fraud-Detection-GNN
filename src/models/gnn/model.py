@@ -5,6 +5,7 @@ import torch
 from torch import optim
 from torch_geometric.data import Data
 
+from src.models.gnn.classifier import EdgeClassifier
 from src.models.gnn.config import GNNModelConfig
 from src.models.gnn.data_loader import (
     compute_degree_histogram,
@@ -16,7 +17,7 @@ from src.models.gnn.evaluator import (
     evaluate_predictions_at_threshold,
     get_labels_for_stage,
 )
-from src.models.gnn.layers import EdgeClassifier, MEGAPNAEncoder
+from src.models.gnn.layers import MEGAPNAEncoder
 from src.models.gnn.loss import prepare_loss_criterion
 from src.models.gnn.utils import (
     GNNCheckpointState,
