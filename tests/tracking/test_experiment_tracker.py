@@ -147,7 +147,9 @@ def test_experiment_tracker_log_model_pytorch(mock_mlflow: MagicMock) -> None:
     tracker.log_model(mock_model, model_name="pytorch_model")
 
     mock_mlflow.sklearn.log_model.assert_not_called()
-    mock_mlflow.pytorch.log_model.assert_called_once_with(mock_model, artifact_path="pytorch_model")
+    mock_mlflow.pytorch.log_model.assert_called_once_with(
+        mock_model, name="pytorch_model", serialization_format="pickle"
+    )
 
 
 def test_experiment_tracker_log_model_pytorch_tuple(mock_mlflow: MagicMock) -> None:
@@ -166,7 +168,8 @@ def test_experiment_tracker_log_model_pytorch_tuple(mock_mlflow: MagicMock) -> N
 
     assert wrapped_model.encoder is encoder
     assert wrapped_model.classifier is classifier
-    assert called_kwargs.get("artifact_path") == "pytorch_tuple_model"
+    assert called_kwargs.get("name") == "pytorch_tuple_model"
+    assert called_kwargs.get("serialization_format") == "pickle"
 
 
 def test_upload_results_to_hub_with_arg(

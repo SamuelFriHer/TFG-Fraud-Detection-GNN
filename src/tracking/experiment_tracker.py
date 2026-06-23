@@ -62,7 +62,7 @@ class ExperimentTracker:
             except TypeError:
                 mlflow.pyfunc.log_model(name=model_name, python_model=model)
         elif isinstance(model, torch.nn.Module):
-            mlflow.pytorch.log_model(model, artifact_path=model_name)
+            mlflow.pytorch.log_model(model, name=model_name, serialization_format="pickle")
         elif (
             isinstance(model, tuple)
             and len(model) == 2
@@ -70,7 +70,7 @@ class ExperimentTracker:
             and isinstance(model[1], torch.nn.Module)
         ):
             wrapper = PyTorchModelWrapper(model[0], model[1])
-            mlflow.pytorch.log_model(wrapper, artifact_path=model_name)
+            mlflow.pytorch.log_model(wrapper, name=model_name, serialization_format="pickle")
         else:
             mlflow.pyfunc.log_model(name=model_name, python_model=model)
         self.logger.info("Model artifact saved as '%s'", model_name)
