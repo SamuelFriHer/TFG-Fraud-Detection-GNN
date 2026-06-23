@@ -6,9 +6,25 @@ import tarfile
 from typing import Any
 
 import mlflow
+import mlflow.pytorch
+import torch
 
 from src.utils.data_manager import DataSyncManager
 from src.utils.paths import MLFLOW_DB_PATH, MLFLOW_DIR, PROJECT_ROOT
+
+
+class PyTorchModelWrapper(torch.nn.Module):
+    """Wraps the GNN encoder and classifier into a single PyTorch module for MLflow."""
+
+    def __init__(self, encoder: torch.nn.Module, classifier: torch.nn.Module) -> None:
+        """Initializes the wrapper with the sub-modules."""
+        super().__init__()
+        self.encoder = encoder
+        self.classifier = classifier
+
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
+        """Forward pass for interface compatibility."""
+        return None
 
 
 class ExperimentTracker:
@@ -39,12 +55,22 @@ class ExperimentTracker:
         self.logger.info("Logged metrics: %s", metrics)
 
     def log_model(self, model: object, model_name: str) -> None:
-        """Persists the trained model, supporting both sklearn and cuML backends."""
+        """Persists the trained model, supporting sklearn, cuML, and PyTorch (GNN) backends."""
         if hasattr(model, "predict"):
             try:
                 mlflow.sklearn.log_model(model, name=model_name)
             except TypeError:
                 mlflow.pyfunc.log_model(name=model_name, python_model=model)
+        elif isinstance(model, torch.nn.Module):
+            mlflow.pytorch.log_model(model, artifact_path=model_name)
+        elif (
+            isinstance(model, tuple)
+            and len(model) == 2
+            and isinstance(model[0], torch.nn.Module)
+            and isinstance(model[1], torch.nn.Module)
+        ):
+            wrapper = PyTorchModelWrapper(model[0], model[1])
+            mlflow.pytorch.log_model(wrapper, artifact_path=model_name)
         else:
             mlflow.pyfunc.log_model(name=model_name, python_model=model)
         self.logger.info("Model artifact saved as '%s'", model_name)

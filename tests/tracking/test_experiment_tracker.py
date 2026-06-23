@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
 
 from src.tracking.experiment_tracker import ExperimentTracker
 
@@ -136,6 +137,36 @@ def test_experiment_tracker_log_model_no_predict(mock_mlflow: MagicMock) -> None
     mock_mlflow.pyfunc.log_model.assert_called_once_with(
         name="other_model", python_model=mock_model
     )
+
+
+def test_experiment_tracker_log_model_pytorch(mock_mlflow: MagicMock) -> None:
+    """Verifies log_model delegates to mlflow.pytorch for torch.nn.Module models."""
+    tracker: ExperimentTracker = ExperimentTracker(experiment_name="test_experiment")
+    mock_model = torch.nn.Linear(10, 2)
+
+    tracker.log_model(mock_model, model_name="pytorch_model")
+
+    mock_mlflow.sklearn.log_model.assert_not_called()
+    mock_mlflow.pytorch.log_model.assert_called_once_with(mock_model, artifact_path="pytorch_model")
+
+
+def test_experiment_tracker_log_model_pytorch_tuple(mock_mlflow: MagicMock) -> None:
+    """Verifies log_model wraps and delegates to mlflow.pytorch for PyTorch module tuples."""
+    tracker: ExperimentTracker = ExperimentTracker(experiment_name="test_experiment")
+    encoder = torch.nn.Linear(10, 5)
+    classifier = torch.nn.Linear(5, 2)
+    model = (encoder, classifier)
+
+    tracker.log_model(model, model_name="pytorch_tuple_model")
+
+    mock_mlflow.sklearn.log_model.assert_not_called()
+    mock_mlflow.pytorch.log_model.assert_called_once()
+    called_args, called_kwargs = mock_mlflow.pytorch.log_model.call_args
+    wrapped_model = called_kwargs.get("pytorch_model") or called_args[0]
+
+    assert wrapped_model.encoder is encoder
+    assert wrapped_model.classifier is classifier
+    assert called_kwargs.get("artifact_path") == "pytorch_tuple_model"
 
 
 def test_upload_results_to_hub_with_arg(
