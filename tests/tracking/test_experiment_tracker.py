@@ -63,13 +63,34 @@ def mock_data_sync_manager() -> Generator[MagicMock, None, None]:
         yield mock_instance
 
 
-def test_experiment_tracker_initialization(
+def test_experiment_tracker_initialization_existing(
     mock_mlflow: MagicMock, mock_paths: dict[str, MagicMock]
 ) -> None:
-    """Verifies that ExperimentTracker configures mlflow correctly on init."""
+    """Verifies that ExperimentTracker uses existing experiment if it exists."""
+    mock_mlflow.get_experiment_by_name.return_value = MagicMock()
     tracker: ExperimentTracker = ExperimentTracker(experiment_name="test_experiment")
     assert tracker.experiment_name == "test_experiment"
     mock_mlflow.set_tracking_uri.assert_called_once_with("sqlite:////fake/path/mlflow.db")
+    mock_mlflow.get_experiment_by_name.assert_called_once_with("test_experiment")
+    mock_mlflow.create_experiment.assert_not_called()
+    mock_mlflow.set_experiment.assert_called_once_with("test_experiment")
+    mock_paths["mlflow_dir"].mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+def test_experiment_tracker_initialization_new(
+    mock_mlflow: MagicMock, mock_paths: dict[str, MagicMock]
+) -> None:
+    """Verifies that ExperimentTracker creates a new experiment with custom artifact_location."""
+    mock_mlflow.get_experiment_by_name.return_value = None
+    mock_paths["mlflow_dir"].__truediv__.return_value.as_uri.return_value = "file:///fake/path/artifacts"
+
+    tracker: ExperimentTracker = ExperimentTracker(experiment_name="test_experiment")
+    assert tracker.experiment_name == "test_experiment"
+    mock_mlflow.set_tracking_uri.assert_called_once_with("sqlite:////fake/path/mlflow.db")
+    mock_mlflow.get_experiment_by_name.assert_called_once_with("test_experiment")
+    mock_mlflow.create_experiment.assert_called_once_with(
+        "test_experiment", artifact_location="file:///fake/path/artifacts"
+    )
     mock_mlflow.set_experiment.assert_called_once_with("test_experiment")
     mock_paths["mlflow_dir"].mkdir.assert_called_once_with(parents=True, exist_ok=True)
 

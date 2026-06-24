@@ -36,6 +36,10 @@ class ExperimentTracker:
         MLFLOW_DIR.mkdir(parents=True, exist_ok=True)
         tracking_uri = f"sqlite:///{MLFLOW_DB_PATH}"
         mlflow.set_tracking_uri(tracking_uri)
+        experiment = mlflow.get_experiment_by_name(experiment_name)
+        if experiment is None:
+            artifact_uri: str = (MLFLOW_DIR / "artifacts").as_uri()
+            mlflow.create_experiment(experiment_name, artifact_location=artifact_uri)
         mlflow.set_experiment(experiment_name)
         self.experiment_name = experiment_name
         self.logger.info("MLflow experiment '%s' at %s", experiment_name, tracking_uri)

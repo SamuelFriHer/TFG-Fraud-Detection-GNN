@@ -40,6 +40,7 @@ class TestResultsExporter:
             patch.object(exporter, "_extract_archive") as mock_extract,
             patch.object(exporter, "_query_experiment", return_value=mock_df),
             patch.object(exporter, "_export_to_csv", return_value=Path("results.csv")),
+            patch.object(exporter, "_extract_explainability_pngs") as mock_extract_pngs,
         ):
             # Act
             result_path = exporter.fetch_and_export(experiment_name, hf_repo_id=repo_id)
@@ -47,6 +48,7 @@ class TestResultsExporter:
             # Assert
             assert result_path == Path("results.csv")
             mock_extract.assert_called_once_with(mock_archive)
+            mock_extract_pngs.assert_called_once()
 
     def test_exception_missing_repo_id(self, exporter: ResultsExporter) -> None:
         """E: Exception when no repo ID is provided or in environment."""
@@ -242,3 +244,31 @@ class TestResultsExporter:
                 exporter._extract_archive(mock_archive)
 
             mock_archive.unlink.assert_called_once()
+
+    def test_extract_explainability_pngs(self, exporter: ResultsExporter, tmp_path: Path) -> None:
+        """Tests that explainability PNGs are correctly identified and copied.
+
+        They are retrieved from the mlflow directory.
+        """
+        mock_outputs_dir = tmp_path / "outputs"
+        mlflow_dir = mock_outputs_dir / "mlflow"
+        explain_src_dir = mlflow_dir / "1" / "run1" / "artifacts" / "explainability" / "XGBoost"
+        explain_src_dir.mkdir(parents=True)
+
+        dummy_png = explain_src_dir / "shap_summary.png"
+        dummy_png.write_text("dummy content")
+
+        other_dir = mlflow_dir / "1" / "run1" / "other"
+        other_dir.mkdir(parents=True)
+        other_png = other_dir / "ignored.png"
+        other_png.write_text("ignored")
+
+        with patch("src.pipelines.results_exporter.OUTPUTS_DIR", mock_outputs_dir):
+            exporter._extract_explainability_pngs()
+
+            dest_png = mock_outputs_dir / "explainability" / "XGBoost" / "shap_summary.png"
+            assert dest_png.exists()
+            assert dest_png.read_text() == "dummy content"
+
+            ignored_dest = mock_outputs_dir / "explainability" / "ignored.png"
+            assert not ignored_dest.exists()

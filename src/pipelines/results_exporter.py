@@ -3,6 +3,7 @@
 import gzip
 import logging
 import os
+import shutil
 import tarfile
 from pathlib import Path
 
@@ -63,6 +64,7 @@ class ResultsExporter:
 
         csv_path = self._export_to_csv(runs_frame, experiment_name)
         self.logger.info("Results exported to %s", csv_path)
+        self._extract_explainability_pngs()
         return csv_path
 
     def _download_archive(self, repo_id: str, archive_name: str) -> Path:
@@ -161,3 +163,40 @@ class ResultsExporter:
         csv_path = RESULTS_DIR / f"{experiment_name}_results.csv"
         frame.to_csv(csv_path, index=False, float_format="%.4f")
         return csv_path
+
+    def _extract_explainability_pngs(self) -> None:
+        """Locates and copies explainability PNG files from the MLflow store.
+
+        They are copied to outputs/explainability/.
+        """
+        mlflow_dir: Path = OUTPUTS_DIR / "mlflow"
+        if not mlflow_dir.exists():
+            return
+
+        target_base_dir: Path = OUTPUTS_DIR / "explainability"
+
+        for root, _, files in os.walk(mlflow_dir):
+            for filename in files:
+                if filename.lower().endswith(".png"):
+                    file_path: Path = Path(root) / filename
+                    try:
+                        parts: tuple[str, ...] = file_path.parts
+                        if "artifacts" in parts and "explainability" in parts:
+                            artifacts_idx: int = parts.index("artifacts")
+                            explain_idx: int = parts.index("explainability")
+                            if explain_idx == artifacts_idx + 1:
+                                rel_parts: tuple[str, ...] = parts[explain_idx + 1 :]
+                                dest_path: Path = target_base_dir.joinpath(*rel_parts)
+                                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                                shutil.copy2(file_path, dest_path)
+                                self.logger.info(
+                                    "Extracted explainability PNG: %s -> %s",
+                                    file_path,
+                                    dest_path,
+                                )
+                    except Exception as extraction_error:
+                        self.logger.warning(
+                            "Failed to extract explainability PNG %s: %s",
+                            file_path,
+                            extraction_error,
+                        )
