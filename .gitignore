@@ -149,8 +149,8 @@ __marimo__/
 # MLflow
 mlruns/
 
-# Documentation
-docs/
+# Resources
+resources/
 
 # Results
 outputs/
